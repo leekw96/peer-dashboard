@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>동종업계 경영지표 대시보드</title>
+<style>
+:root{
+  --bg:#0C1524;--card:#162033;--border:#1E3050;
+  --text:#E2EAF4;--muted:#6B8BAD;--dim:#3D5470;
+  --c1:#4A9FE0;--c2:#E05A5A;--c3:#F4913A;
+  --pos:#3DD68C;--neg:#F46F6F;--warn:#F5C842;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',sans-serif;font-size:13px}
+
+/* HEADER */
+.hdr{background:linear-gradient(180deg,#0E1E32 0%,var(--bg) 100%);padding:14px 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);gap:12px;flex-wrap:wrap}
+.hdr-t{font-size:16px;font-weight:700;letter-spacing:-.3px}
+.hdr-s{font-size:11px;color:var(--muted);margin-top:3px}
+.badge{background:rgba(74,159,224,.1);border:1px solid rgba(74,159,224,.22);color:#7DB8F5;padding:3px 9px;border-radius:5px;font-size:10.5px}
+.badge-yr{background:rgba(245,200,66,.08);border:1px solid rgba(245,200,66,.25);color:var(--warn);padding:3px 9px;border-radius:5px;font-size:10.5px}
+
+/* YEAR CONTROL */
+.yr-wrap{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.yr-ctrl{display:flex;align-items:center;gap:3px}
+.yr-btn{background:rgba(74,159,224,.12);border:1px solid rgba(74,159,224,.25);color:#7DB8F5;width:26px;height:26px;border-radius:5px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.yr-btn:hover{background:rgba(74,159,224,.28)}
+.yr-input{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);width:60px;height:26px;border-radius:5px;text-align:center;font-size:13px;font-weight:700;-moz-appearance:textfield}
+.yr-input::-webkit-outer-spin-button,.yr-input::-webkit-inner-spin-button{-webkit-appearance:none}
+.yr-input:focus{outline:none;border-color:var(--c1)}
+.fetch-btn{background:var(--c1);border:none;color:#fff;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;transition:opacity .15s;height:26px}
+.fetch-btn:hover{opacity:.85}
+.fetch-btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* OVERLAY */
+#overlay{display:none;position:fixed;inset:0;background:rgba(12,21,36,.88);z-index:100;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+#overlay.show{display:flex}
+.spinner{width:38px;height:38px;border:3px solid rgba(74,159,224,.2);border-top-color:var(--c1);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ov-txt{font-size:13px;color:var(--muted)}
+.ov-sub{font-size:11px;color:var(--dim)}
+
+/* ERROR */
+#err-bar{display:none;margin:10px 20px 0;background:rgba(244,111,111,.1);border:1px solid rgba(244,111,111,.3);border-radius:7px;padding:8px 13px;color:#F46F6F;font-size:12px}
+#err-bar.show{display:block}
+
+/* LAYOUT */
+.wrap{padding:12px 20px 28px;display:flex;flex-direction:column;gap:11px}
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.sec-label{font-size:11px;font-weight:700;color:var(--dim);text-transform:uppercase;letter-spacing:.8px;padding:2px 0 4px;border-bottom:1px solid var(--border)}
+.cc{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px}
+.st{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
+.sub{font-size:10px;color:var(--dim);margin:8px 0 5px}
+
+/* KPI CARD */
+.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.kh{padding:9px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px}
+.dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.kn{font-size:13px;font-weight:700}
+.kt{margin-left:auto;font-size:10px;color:var(--muted)}
+.kb{padding:11px 13px;display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.kl{font-size:10px;color:var(--muted);margin-bottom:2px}
+.kv{font-size:16px;font-weight:700;line-height:1.1}
+.kc{font-size:10px;margin-top:2px}
+.up{color:var(--pos)}.dn{color:var(--neg)}.fl{color:var(--muted)}
+
+/* BAR CHARTS */
+.bg{display:flex;flex-direction:column;gap:5px;margin-bottom:11px}
+.br{display:flex;align-items:center;gap:6px}
+.bc{width:60px;font-size:10px;text-align:right;flex-shrink:0}
+.bt{flex:1;height:17px;background:rgba(255,255,255,.04);border-radius:3px;overflow:hidden}
+.bf{height:100%;border-radius:3px;display:flex;align-items:center;justify-content:flex-end;padding-right:5px;min-width:2px}
+.bf span{font-size:9px;font-weight:700;color:rgba(255,255,255,.9);white-space:nowrap}
+.bf-n{height:100%;border-radius:3px;background:rgba(244,111,111,.4);display:flex;align-items:center;padding-left:5px}
+.bf-n span{font-size:9px;font-weight:700;color:rgba(255,255,255,.9);white-space:nowrap}
+.bo{font-size:10px;font-weight:600;min-width:44px;text-align:left;flex-shrink:0}
+
+/* RATIO BAR */
+.rr{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.rc{width:54px;font-size:10px;flex-shrink:0}
+.rt{flex:1;height:6px;background:rgba(255,255,255,.06);border-radius:10px;overflow:hidden}
+.rf{height:100%;border-radius:10px}
+.rv{width:40px;text-align:right;font-size:10px;font-weight:600;flex-shrink:0}
+.rb{margin-bottom:10px}
+
+/* STRUCTURE BAR */
+.si{margin-bottom:9px}
+.sl{font-size:10px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:3px}
+.sb{height:20px;display:flex;border-radius:4px;overflow:hidden}
+.sb-l,.sb-r{display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:rgba(255,255,255,.8)}
+
+/* EMP / SAL CARDS */
+.emp-card,.sal-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.ech{padding:9px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:7px}
+.ecb{padding:12px 13px}
+.big-n{font-size:22px;font-weight:700;margin-bottom:2px}
+.sub2{font-size:10px;color:var(--muted);margin-bottom:9px}
+.emp-row{display:flex;justify-content:space-between;align-items:center;padding:3.5px 0;border-bottom:1px solid rgba(30,48,80,.6)}
+.emp-row:last-child{border-bottom:none}
+.el{font-size:11px;color:var(--muted)}.ev{font-size:12px;font-weight:600}
+.gbar{height:12px;border-radius:6px;overflow:hidden;display:flex;margin:7px 0 3px}
+.gm,.gf{display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:700;color:rgba(255,255,255,.85)}
+.glbl{display:flex;justify-content:space-between;font-size:9.5px;color:var(--muted)}
+.trow{display:flex;gap:6px;margin-top:8px}
+.tbox{flex:1;background:rgba(255,255,255,.04);border-radius:6px;padding:7px 8px;text-align:center;border:1px solid var(--border)}
+.tlbl{font-size:9px;color:var(--muted);margin-bottom:2px}
+.tval{font-size:14px;font-weight:700}
+.tunit{font-size:9px;color:var(--muted)}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border)}
+.sgb{background:rgba(255,255,255,.03);border-radius:6px;padding:7px 8px}
+.sgl{font-size:9px;color:var(--muted);margin-bottom:2px}
+.sgv{font-size:13px;font-weight:700}
+.sgu{font-size:9px;color:var(--muted)}
+.avg-box{margin-top:8px;padding:7px 8px;background:rgba(255,255,255,.03);border-radius:6px;display:flex;justify-content:space-between;align-items:center}
+
+/* VERIFY PANEL */
+.vfy-sec{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:13px}
+.vfy-tbl{width:100%;border-collapse:collapse;table-layout:auto}
+.vfy-tbl th{padding:5px 8px;font-size:9.5px;color:var(--dim);font-weight:600;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;background:none}
+.vfy-tbl td{padding:4.5px 8px;font-size:11px;text-align:left;border-bottom:1px solid rgba(30,48,80,.5);color:var(--text);font-weight:400}
+.vfy-tbl td:first-child{text-align:left;color:var(--muted);font-size:10.5px;font-weight:400;min-width:80px}
+.vfy-tbl td:nth-child(2){text-align:left;color:var(--dim);font-size:10px}
+.vfy-tbl td:nth-child(3){font-size:10px;color:var(--muted)}
+.vfy-tbl tr:last-child td{border-bottom:none}
+.vfy-tbl tr:hover td{background:rgba(255,255,255,.02)}
+
+/* TABLE */
+.tbl-card{background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.tbl-hd{padding:9px 13px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+table{width:100%;border-collapse:collapse}
+th{padding:5px 10px;font-size:10px;color:var(--dim);text-align:right;border-bottom:1px solid var(--border);font-weight:600;white-space:nowrap}
+th:first-child,th:nth-child(2){text-align:left}
+td{padding:5px 10px;font-size:11.5px;text-align:right;border-bottom:1px solid rgba(30,48,80,.7)}
+td:first-child{text-align:left;color:var(--c1);font-size:10px;font-weight:600}
+td:nth-child(2){text-align:left;color:var(--muted)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.018)}
+.best{font-weight:700}
+.c1t{color:var(--c1)}.c2t{color:var(--c2)}.c3t{color:var(--c3)}
+.tbl-ft{padding:7px 13px;font-size:9.5px;color:var(--dim);border-top:1px solid var(--border)}
+.upd{font-size:10.5px;color:var(--muted)}
+.note-bar{background:rgba(245,200,66,.07);border:1px solid rgba(245,200,66,.22);border-radius:7px;padding:7px 12px;color:var(--warn);font-size:11px;line-height:1.5}
+
+/* MOBILE */
+@media (max-width:900px){
+  .kpi-row,.three{grid-template-columns:1fr}
+  .two{grid-template-columns:1fr}
+}
+@media (max-width:600px){
+  .hdr{padding:12px 16px}
+  .wrap{padding:10px 16px 24px}
+  #err-bar{margin:10px 16px 0}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <div class="hdr-t">동종업계 경영지표 대시보드</div>
+    <div class="hdr-s">풀무원식품 · 동원F&amp;B · 샘표식품 &nbsp;|&nbsp; 별도 재무제표 · 임직원 현황</div>
+  </div>
+  <div class="yr-wrap">
+    <span class="badge">DART Open API</span>
+    <span class="badge">별도(OFS)</span>
+    <div class="yr-ctrl">
+      <button class="yr-btn" onclick="changeYear(-1)">◀</button>
+      <input type="number" class="yr-input" id="yr" value="" min="2015" max="2040">
+      <button class="yr-btn" onclick="changeYear(1)">▶</button>
+    </div>
+    <button class="fetch-btn" id="fetch-btn" onclick="loadData()">조회</button>
+    <span class="badge-yr" id="yr-badge">-</span>
+    <span class="upd" id="upd"></span>
+  </div>
+</div>
+
+<!-- OVERLAY -->
+<div id="overlay">
+  <div class="spinner"></div>
+  <div class="ov-txt" id="ov-txt">DART 데이터 조회 중...</div>
+  <div class="ov-sub" id="ov-sub">잠시만 기다려 주세요</div>
+</div>
+
+<!-- ERROR -->
+<div id="err-bar"></div>
+
+<!-- MAIN (동적 렌더링) -->
+<div class="wrap" id="main"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────
+// 데이터는 GitHub Actions가 DART Open API에서 받아 data/*.json 으로 저장합니다.
+// 이 페이지에는 API 키가 없으며, DART를 직접 호출하지 않습니다.
+const COS = [
+  { key:'p', name:'풀무원식품', code:'00684732', color:'#4A9FE0', cb:'rgba(74,159,224,' },
+  { key:'d', name:'동원F&amp;B',     code:'00340917', color:'#E05A5A', cb:'rgba(224,90,90,' },
+  { key:'s', name:'샘표식품',   code:'01167056', color:'#F4913A', cb:'rgba(244,145,58,' },
+];
+let INDEX = null;   // data/index.json
+let _cumulative = false;
+let _missing = new Set(); // 재무데이터가 없는 회사 key (0으로 표시하지 않음) // 분기·반기 보고서면 손익은 누적금액 사용
+
+async function getJSON(path) {
+  const r = await fetch(path, { cache: 'no-cache' });
+  if (!r.ok) throw new Error(`${path} (HTTP ${r.status})`);
+  return r.json();
+}
+
+// ── PARSE ────────────────────────────────────
+function n(v) { if (!v || v === '-') return 0; return parseInt(String(v).replace(/,/g,'')) || 0; }
+function f(v) { return parseFloat(v) || 0; }
+
+function parseFS(rows) {
+  const ofs = rows.filter(r => r.fs_div === 'OFS');
+  const get = (sj, re) => {
+    const row = ofs.find(r => r.sj_div === sj && re.test(r.account_nm));
+    if (!row) return { c:0, p:0, nm:'' };
+    if (_cumulative && sj === 'IS' && row.thstrm_add_amount)
+      return { c: n(row.thstrm_add_amount), p: n(row.frmtrm_add_amount), nm: row.thstrm_nm || '' };
+    return { c: n(row.thstrm_amount), p: n(row.frmtrm_amount), nm: row.thstrm_nm || '' };
+  };
+  return {
+    rev:  get('IS', /수익\(매출액\)|^매출액$/),
+    op:   get('IS', /^영업이익/),
+    net:  get('IS', /당기순이익/),
+    ci:   get('IS', /총포괄손익/),
+    ca:   get('BS', /^유동자산$/),
+    nca:  get('BS', /^비유동자산$/),
+    ta:   get('BS', /자산총계/),
+    cl:   get('BS', /^유동부채$/),
+    ncl:  get('BS', /^비유동부채$/),
+    tl:   get('BS', /부채총계/),
+    eq:   get('BS', /자본총계/),
+    period: ofs.find(r => r.thstrm_nm)?.thstrm_nm || '',
+  };
+}
+
+
+function parseEmp(rows) {
+  const M = rows.find(r => r.sexdstn === '남') || {};
+  const F = rows.find(r => r.sexdstn === '여') || {};
+  const smM = n(M.sm), smF = n(F.sm), total = smM + smF;
+  const salM = n(M.fyer_salary_totamt), salF = n(F.fyer_salary_totamt), salTot = salM + salF;
+  const rawAvgM = n(M.jan_salary_am), rawAvgF = n(F.jan_salary_am);
+  // DART가 연도/회사에 따라 천원 단위로 반환하는 경우 보정 (1인 평균이 100만원 미만이면 천원 단위로 판단)
+  const avgAll0 = total ? salTot / total : 0;
+  const mult = (avgAll0 > 0 && avgAll0 < 1000000) ? 1000 : 1;
+  return {
+    total, smM, smF,
+    reg: n(M.rgllbr_co) + n(F.rgllbr_co),
+    ctrt: n(M.cnttk_co) + n(F.cnttk_co),
+    salTot: salTot * mult, salM: salM * mult, salF: salF * mult,
+    avgM: rawAvgM * mult, avgF: rawAvgF * mult,
+    avgAll: (rawAvgM && rawAvgF) ? Math.round((rawAvgM + rawAvgF) * mult / 2) : (total ? Math.round(salTot * mult / total) : 0),
+    tenM: f(M.avrg_cnwk_sdytrn), tenF: f(F.avrg_cnwk_sdytrn),
+    tenAvg: total ? (f(M.avrg_cnwk_sdytrn)*smM + f(F.avrg_cnwk_sdytrn)*smF) / total : 0,
+  };
+}
+
+// ── FORMAT ───────────────────────────────────
+const 억 = v => {
+  const a = Math.abs(v), s = v < 0 ? '-' : '';
+  return a >= 1e11 ? s + Math.round(a/1e8).toLocaleString() + '억'
+       : s + (a/1e8).toFixed(1) + '억';
+};
+const 만 = v => Math.round(v/10000).toLocaleString() + '만';
+
+function yoyHtml(c, p) {
+  if (!p) return '';
+  const r = (c - p) / Math.abs(p) * 100;
+  if (c < 0 && p >= 0) return '<span class="dn">▼ 적자전환</span>';
+  if (c >= 0 && p < 0) return '<span class="up">▲ 흑자전환</span>';
+  const cls = r > 0 ? 'up' : r < 0 ? 'dn' : 'fl';
+  return `<span class="${cls}">${r>0?'▲ +':'▼ '}${r.toFixed(1)}%</span>`;
+}
+
+// ── RENDER HELPERS ───────────────────────────
+function barRow(co, val, max, lbl) {
+  if (_missing.has(co.key)) return `<div class="br"><div class="bc" style="color:${co.color}">${co.name}</div><div class="bt"></div><span class="bo"><span style="color:var(--dim)">데이터 없음</span></span></div>`;
+  const isNeg = val < 0;
+  const pctW = max > 0 ? Math.min(100, Math.abs(val)/Math.abs(max)*100) : 0;
+  const inside = pctW > 22;
+  const fill = isNeg
+    ? `<div class="bf-n" style="width:${Math.max(pctW,2)}%"><span>${lbl}</span></div>`
+    : inside
+      ? `<div class="bf" style="width:${pctW}%;background:${co.color}"><span>${lbl}</span></div>`
+      : `<div class="bf" style="width:${Math.max(pctW,1.5)}%;background:${co.color}"></div>`;
+  const outside = (!inside || isNeg) ? `<span class="bo" style="${isNeg?'color:var(--neg)':''}">${lbl}</span>` : '';
+  return `<div class="br"><div class="bc" style="color:${co.color}">${co.name}</div><div class="bt">${fill}</div>${outside}</div>`;
+}
+
+function ratioBar(co, val, max, lbl) {
+  if (_missing.has(co.key)) return `<div class="rr"><span class="rc" style="color:${co.color}">${co.name}</span><div class="rt"></div><span class="rv" style="width:auto"><span style="color:var(--dim)">데이터 없음</span></span></div>`;
+  const pctW = max > 0 ? Math.min(100, Math.abs(val)/Math.abs(max)*100) : 0;
+  const isNeg = val < 0;
+  return `<div class="rr">
+    <span class="rc" style="color:${co.color}">${co.name}</span>
+    <div class="rt"><div class="rf" style="width:${pctW}%;background:${isNeg?'var(--neg)':co.color}"></div></div>
+    <span class="rv" style="${isNeg?'color:var(--neg)':''}">${lbl}</span>
+  </div>`;
+}
+
+// ── RENDER SECTIONS ──────────────────────────
+function renderKPI(D) {
+  return COS.map(co => {
+    const f = D[co.key].fin;
+    if (_missing.has(co.key)) return `<div class="kpi-card" style="border-top:3px solid ${co.color}">
+      <div class="kh"><div class="dot" style="background:${co.color}"></div><span class="kn">${co.name}</span></div>
+      <div style="padding:26px 13px;text-align:center;color:var(--muted);font-size:12px">해당 연도 공시 재무데이터 없음</div></div>`;
+    return `<div class="kpi-card" style="border-top:3px solid ${co.color}">
+      <div class="kh"><div class="dot" style="background:${co.color}"></div>
+        <span class="kn">${co.name}</span>
+        <span class="kt">별도 · ${f.period}</span></div>
+      <div class="kb">
+        <div><div class="kl">매출액</div><div class="kv" style="color:${co.color}">${억(f.rev.c)}</div><div class="kc">${yoyHtml(f.rev.c,f.rev.p)||'<span class="fl">-</span>'}</div></div>
+        <div><div class="kl">영업이익</div><div class="kv" style="${f.op.c<0?'color:var(--neg)':''}">${억(f.op.c)}</div><div class="kc">${yoyHtml(f.op.c,f.op.p)||'<span class="fl">-</span>'}</div></div>
+        <div><div class="kl">당기순이익</div><div class="kv" style="${f.net.c<0?'color:var(--neg)':''}">${억(f.net.c)}</div><div class="kc">${yoyHtml(f.net.c,f.net.p)||'<span class="fl">-</span>'}</div></div>
+        <div><div class="kl">자본총계</div><div class="kv">${억(f.eq.c)}</div><div class="kc">${yoyHtml(f.eq.c,f.eq.p)||'<span class="fl">-</span>'}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderIS(D) {
+  const maxRev = Math.max(...COS.map(co=>D[co.key].fin.rev.c));
+  const maxOp  = Math.max(...COS.map(co=>Math.abs(D[co.key].fin.op.c)));
+  const maxNet = Math.max(...COS.map(co=>Math.abs(D[co.key].fin.net.c)));
+  const maxOpM = Math.max(...COS.map(co=>{const f=D[co.key].fin;return f.rev.c?Math.abs(f.op.c/f.rev.c):0}));
+  const maxNtM = Math.max(...COS.map(co=>{const f=D[co.key].fin;return f.rev.c?Math.abs(f.net.c/f.rev.c):0}));
+  return `<div class="cc">
+    <div class="st">포괄손익계산서 (별도)</div>
+    <div class="sub">매출액</div>
+    <div class="bg">${COS.map(co=>barRow(co,D[co.key].fin.rev.c,maxRev,억(D[co.key].fin.rev.c))).join('')}</div>
+    <div class="sub">영업이익</div>
+    <div class="bg">${COS.map(co=>barRow(co,D[co.key].fin.op.c,maxOp,억(D[co.key].fin.op.c))).join('')}</div>
+    <div class="sub">당기순이익</div>
+    <div class="bg">${COS.map(co=>barRow(co,D[co.key].fin.net.c,maxNet,억(D[co.key].fin.net.c))).join('')}</div>
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-top:2px">
+      <div class="sub" style="margin-top:0">영업이익률</div>
+      <div class="rb">${COS.map(co=>{const f=D[co.key].fin;const v=f.rev.c?f.op.c/f.rev.c*100:0;return ratioBar(co,v,Math.max(maxOpM*100,.01),v.toFixed(1)+'%')}).join('')}</div>
+      <div class="sub">순이익률</div>
+      <div class="rb" style="margin-bottom:0">${COS.map(co=>{const f=D[co.key].fin;const v=f.rev.c?f.net.c/f.rev.c*100:0;return ratioBar(co,v,Math.max(maxNtM*100,.01),v.toFixed(1)+'%')}).join('')}</div>
+    </div>
+  </div>`;
+}
+
+function renderBS(D) {
+  const structBars = COS.map(co => {
+    const f = D[co.key].fin;
+    if (_missing.has(co.key)) return `<div class="si"><div class="sl"><span style="color:${co.color}">${co.name}</span><span style="color:var(--dim)">데이터 없음</span></div></div>`;
+    const lPct = f.ta.c > 0 ? f.tl.c/f.ta.c*100 : 50;
+    return `<div class="si">
+      <div class="sl"><span style="color:${co.color}">${co.name} <span style="color:var(--muted)">${억(f.ta.c)}</span></span>
+        <span>부채 ${lPct.toFixed(1)}% / 자본 ${(100-lPct).toFixed(1)}%</span></div>
+      <div class="sb">
+        <div class="sb-l" style="width:${lPct}%;background:${co.cb}.4)">부채 ${억(f.tl.c)}</div>
+        <div class="sb-r" style="flex:1;background:${co.cb}.18)">자본 ${억(f.eq.c)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const maxDR = Math.max(...COS.map(co=>{const f=D[co.key].fin;return f.eq.c?f.tl.c/f.eq.c*100:0}));
+  const maxCR = Math.max(...COS.map(co=>{const f=D[co.key].fin;return f.cl.c?f.ca.c/f.cl.c*100:0}));
+  return `<div class="cc">
+    <div class="st">재무상태표 (별도)</div>
+    <div class="sub" style="margin-top:0">재무구조</div>
+    ${structBars}
+    <div style="border-top:1px solid var(--border);padding-top:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px">
+        <div>
+          <div class="sub" style="margin-top:0">부채비율 ↓</div>
+          <div class="rb">${COS.map(co=>{const f=D[co.key].fin;const v=f.eq.c?f.tl.c/f.eq.c*100:0;return ratioBar(co,v,Math.max(maxDR,.01),v.toFixed(1)+'%')}).join('')}</div>
+        </div>
+        <div>
+          <div class="sub" style="margin-top:0">유동비율 ↑</div>
+          <div class="rb">${COS.map(co=>{const f=D[co.key].fin;const v=f.cl.c?f.ca.c/f.cl.c*100:0;return ratioBar(co,v,Math.max(maxCR,.01),v.toFixed(1)+'%')}).join('')}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderEmp(D) {
+  return COS.map(co => {
+    const e = D[co.key].emp;
+    if (!e.total) return `<div class="emp-card" style="border-top:3px solid ${co.color}">
+      <div class="ech"><div class="dot" style="background:${co.color}"></div><span style="font-size:13px;font-weight:700">${co.name}</span></div>
+      <div class="ecb" style="color:var(--muted);font-size:12px;padding:20px;text-align:center">임직원 데이터 없음</div>
+    </div>`;
+    const mPct = (e.smM/e.total*100).toFixed(1);
+    const ctrtPct = (e.ctrt/e.total*100).toFixed(1);
+    const tenAvg = ((e.tenM*e.smM + e.tenF*e.smF)/e.total).toFixed(1);
+    return `<div class="emp-card" style="border-top:3px solid ${co.color}">
+      <div class="ech"><div class="dot" style="background:${co.color}"></div>
+        <span style="font-size:13px;font-weight:700">${co.name}</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--muted)">별도 기준</span></div>
+      <div class="ecb">
+        <div class="big-n" style="color:${co.color}">${e.total.toLocaleString()}<span style="font-size:13px;font-weight:400;color:var(--muted)">명</span></div>
+        <div class="sub2">정규직 ${e.reg.toLocaleString()}명 · 계약직 ${e.ctrt.toLocaleString()}명</div>
+        <div class="gbar">
+          <div class="gm" style="width:${mPct}%;background:${co.cb}.55)">남 ${e.smM.toLocaleString()}</div>
+          <div class="gf" style="flex:1;background:${co.cb}.25)">여 ${e.smF.toLocaleString()}</div>
+        </div>
+        <div class="glbl"><span>남 ${mPct}%</span><span>여 ${(100-parseFloat(mPct)).toFixed(1)}%</span></div>
+        <div class="emp-row"><span class="el">정규직</span><span class="ev">${e.reg.toLocaleString()}명</span></div>
+        <div class="emp-row"><span class="el">계약직</span><span class="ev">${e.ctrt.toLocaleString()}명</span></div>
+        <div class="emp-row"><span class="el">계약직 비율</span><span class="ev" style="${parseFloat(ctrtPct)>10?'color:var(--warn)':''}">${ctrtPct}%</span></div>
+        <div class="trow">
+          <div class="tbox"><div class="tlbl">남 평균근속</div><div class="tval">${e.tenM.toFixed(1)}<span class="tunit">년</span></div></div>
+          <div class="tbox"><div class="tlbl">여 평균근속</div><div class="tval">${e.tenF.toFixed(1)}<span class="tunit">년</span></div></div>
+          <div class="tbox"><div class="tlbl">전체 평균</div><div class="tval">${tenAvg}<span class="tunit">년</span></div></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSal(D) {
+  const maxSR = Math.max(...COS.map(co => {
+    const e=D[co.key].emp, f=D[co.key].fin;
+    return f.rev.c > 0 ? e.salTot/f.rev.c*100 : 0;
+  }));
+  return COS.map(co => {
+    const e = D[co.key].emp, f = D[co.key].fin;
+    if (!e.total) return `<div class="sal-card" style="border-top:3px solid ${co.color}">
+      <div class="ech"><div class="dot" style="background:${co.color}"></div><span style="font-size:13px;font-weight:700">${co.name}</span></div>
+      <div class="ecb" style="color:var(--muted);font-size:12px;padding:20px;text-align:center">인건비 데이터 없음</div>
+    </div>`;
+    const salRatPct = f.rev.c > 0 ? e.salTot/f.rev.c*100 : 0;
+    const ratioBarsHtml = COS.map(c2=>{
+      const e2=D[c2.key].emp, f2=D[c2.key].fin;
+      const v2 = f2.rev.c > 0 ? e2.salTot/f2.rev.c*100 : 0;
+      return ratioBar(c2, v2, Math.max(maxSR,.01), v2.toFixed(2)+'%');
+    }).join('');
+    return `<div class="sal-card" style="border-top:3px solid ${co.color}">
+      <div class="ech"><div class="dot" style="background:${co.color}"></div>
+        <span style="font-size:13px;font-weight:700">${co.name}</span></div>
+      <div class="ecb">
+        <div class="big-n" style="color:${co.color}">${억(e.salTot)}</div>
+        <div class="sub2">연간 인건비 총액</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">매출 대비 인건비율</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:7px">${salRatPct.toFixed(2)}%</div>
+        <div class="rb" style="margin-bottom:2px">${ratioBarsHtml}</div>
+        <div class="sg">
+          <div class="sgb"><div class="sgl">남 1인평균</div><div class="sgv">${만(e.avgM)}<span class="sgu">원/년</span></div></div>
+          <div class="sgb"><div class="sgl">여 1인평균</div><div class="sgv">${만(e.avgF)}<span class="sgu">원/년</span></div></div>
+        </div>
+        <div class="avg-box">
+          <span style="font-size:10px;color:var(--muted)">전체 1인평균</span>
+          <span style="font-size:15px;font-weight:700;color:${co.color}">${만(e.avgAll)}<span style="font-size:10px;font-weight:400;color:var(--muted)">원/년</span></span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── ROA · ROE · CIR ──────────────────────────
+function renderRatios(D) {
+  const rows = COS.map(co => {
+    const f = D[co.key].fin;
+    return {
+      co,
+      roa: f.ta.c ? f.net.c / f.ta.c * 100 : 0,
+      roe: f.eq.c ? f.net.c / f.eq.c * 100 : 0,
+      cir: f.rev.c ? (f.rev.c - f.op.c) / f.rev.c * 100 : 0,
+    };
+  });
+
+  function card(key, label, sub, formula, dir, inv, accent) {
+    const vals  = rows.map(r => r[key]);
+    const absMax = Math.max(...vals.map(Math.abs), 0.01);
+    const valid = rows.filter(r => !_missing.has(r.co.key)).map(r => r[key]);
+    const best  = valid.length ? (inv ? Math.min(...valid) : Math.max(...valid)) : null;
+    const bars  = rows.map(({ co, ...r }) => {
+      if (_missing.has(co.key)) return `<div class="rr"><span class="rc" style="color:${co.color}">${co.name}</span><div class="rt"></div><span style="min-width:60px;text-align:right;font-size:10px;flex-shrink:0"><span style="color:var(--dim)">데이터 없음</span></span></div>`;
+      const v = r[key], isNeg = v < 0;
+      const pw = absMax > 0 ? Math.min(100, Math.abs(v) / absMax * 100) : 0;
+      const isBest = v === best;
+      return `<div class="rr">
+        <span class="rc" style="color:${co.color}">${co.name}</span>
+        <div class="rt"><div class="rf" style="width:${pw}%;background:${isNeg ? 'var(--neg)' : co.color}"></div></div>
+        <span style="min-width:60px;text-align:right;font-size:10px;font-weight:${isBest ? '700' : '600'};flex-shrink:0;color:${isBest ? co.color : isNeg ? 'var(--neg)' : 'var(--text)'}">${v.toFixed(2)}%${isBest ? ' ★' : ''}</span>
+      </div>`;
+    }).join('');
+    return `<div class="cc" style="border-top:3px solid ${accent}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px">
+        <div>
+          <div style="font-size:22px;font-weight:800;color:${accent};line-height:1;letter-spacing:-1px">${label}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px">${sub}</div>
+        </div>
+        <div style="text-align:right;padding-top:2px">
+          <div style="font-size:9px;color:var(--dim)">${formula}</div>
+          <div style="font-size:9px;margin-top:3px;padding:2px 6px;background:${accent}18;border:1px solid ${accent}33;border-radius:4px;color:${accent}">${dir}&nbsp;${inv ? '낮을수록 효율' : '높을수록 우수'}</div>
+        </div>
+      </div>
+      <div style="height:1px;background:var(--border);margin-bottom:9px"></div>
+      <div class="rb" style="margin-bottom:0">${bars}</div>
+    </div>`;
+  }
+
+  return `<div class="three">
+    ${card('roa', 'ROA', '총자산이익률 (Return on Assets)',    '당기순이익 ÷ 자산총계', '↑', false, '#4A9FE0')}
+    ${card('roe', 'ROE', '자기자본이익률 (Return on Equity)',  '당기순이익 ÷ 자본총계', '↑', false, '#3DD68C')}
+    ${card('cir', 'CIR', '비용수익비율 (Cost-to-Income Ratio)','영업비용 ÷ 매출액', '↓', true,  '#F5C842')}
+  </div>`;
+}
+
+function renderTable(D, year, reprtLabel = '사업보고서') {
+  function best(arr, invert) {
+    const clean = arr.map((v,i) => _missing.has(COS[i].key) ? (invert ? Infinity : -Infinity) : Number(v));
+    if (clean.every(v => !isFinite(v))) return -1;
+    const b = invert ? Math.min(...clean) : Math.max(...clean);
+    return clean.indexOf(b);
+  }
+  const rows = [
+    ['손익','매출액',     co=>억(D[co].fin.rev.c),  a=>best([D.p.fin.rev.c, D.d.fin.rev.c, D.s.fin.rev.c],false)],
+    ['',   '영업이익',    co=>`<span style="${D[co].fin.op.c<0?'color:var(--neg)':''}">${억(D[co].fin.op.c)}</span>`, a=>best([D.p.fin.op.c,D.d.fin.op.c,D.s.fin.op.c],false)],
+    ['',   '영업이익률',  co=>{const v=D[co].fin;return v.rev.c?`<span style="${v.op.c<0?'color:var(--neg)':''}">${(v.op.c/v.rev.c*100).toFixed(1)}%</span>`:'N/A'}, a=>best(COS.map(co=>D[co.key].fin.rev.c?D[co.key].fin.op.c/D[co.key].fin.rev.c:0),false)],
+    ['',   '당기순이익',  co=>`<span style="${D[co].fin.net.c<0?'color:var(--neg)':''}">${억(D[co].fin.net.c)}</span>`, a=>best([D.p.fin.net.c,D.d.fin.net.c,D.s.fin.net.c],false)],
+    ['안정성','부채비율↓', co=>{const f=D[co].fin;return f.eq.c?(f.tl.c/f.eq.c*100).toFixed(1)+'%':'N/A'}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.eq.c?f.tl.c/f.eq.c:9999}),true)],
+    ['',     '유동비율↑', co=>{const f=D[co].fin;return f.cl.c?(f.ca.c/f.cl.c*100).toFixed(1)+'%':'N/A'}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.cl.c?f.ca.c/f.cl.c:0}),false)],
+    ['',     '자기자본비율↑',co=>{const f=D[co].fin;return f.ta.c?(f.eq.c/f.ta.c*100).toFixed(1)+'%':'N/A'},a=>best(COS.map(co=>{const f=D[co.key].fin;return f.ta.c?f.eq.c/f.ta.c:0}),false)],
+    ['인력','전체임직원',  co=>`${(D[co].emp.total||0).toLocaleString()}명`, a=>best(COS.map(co=>D[co.key].emp.total),false)],
+    ['',    '정규직비율', co=>{const e=D[co].emp;return e.total?((e.reg/e.total)*100).toFixed(1)+'%':'N/A'}, a=>best(COS.map(co=>{const e=D[co.key].emp;return e.total?e.reg/e.total:0}),false)],
+    ['',    '평균근속↑',  co=>{const e=D[co].emp;return e.total?((e.tenM*e.smM+e.tenF*e.smF)/e.total).toFixed(1)+'년':'N/A'}, a=>best(COS.map(co=>{const e=D[co.key].emp;return e.total?(e.tenM*e.smM+e.tenF*e.smF)/e.total:0}),false)],
+    ['인건비','인건비총액',co=>억(D[co].emp.salTot||0), a=>best(COS.map(co=>D[co.key].emp.salTot),false)],
+    ['',     '1인평균연봉↑',co=>`${만(D[co].emp.avgAll||0)}원`, a=>best(COS.map(co=>D[co.key].emp.avgAll),false)],
+    ['',     '매출대비인건비↓',co=>{const e=D[co].emp,f=D[co].fin;return f.rev.c&&e.salTot?(e.salTot/f.rev.c*100).toFixed(2)+'%':'N/A'}, a=>best(COS.map(co=>{const e=D[co.key].emp,f=D[co.key].fin;return f.rev.c&&e.salTot?e.salTot/f.rev.c:9999}),true)],
+    ['수익성','ROA ↑',  co=>{const f=D[co].fin;const v=f.ta.c?f.net.c/f.ta.c*100:0;return`<span style="${v<0?'color:var(--neg)':''}">${v.toFixed(2)}%</span>`}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.ta.c?f.net.c/f.ta.c:0}),false)],
+    ['',     'ROE ↑',  co=>{const f=D[co].fin;const v=f.eq.c?f.net.c/f.eq.c*100:0;return`<span style="${v<0?'color:var(--neg)':''}">${v.toFixed(2)}%</span>`}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.eq.c?f.net.c/f.eq.c:0}),false)],
+    ['',     'CIR ↓',  co=>{const f=D[co].fin;const v=f.rev.c?(f.rev.c-f.op.c)/f.rev.c*100:0;return f.rev.c?v.toFixed(2)+'%':'N/A'}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.rev.c?(f.rev.c-f.op.c)/f.rev.c:9999}),true)],
+  ];
+  const cc = ['c1t','c2t','c3t'];
+  const tbody = rows.map(([cat,item,vFn,bFn]) => {
+    const bestIdx = bFn(null);
+    return `<tr><td>${cat}</td><td>${item}</td>${COS.map((co,i)=>{const isEmp=['전체임직원','정규직비율','평균근속↑','인건비총액','1인평균연봉↑'].includes(item);const miss=isEmp?!D[co.key].emp.total:(_missing.has(co.key)||(item==='매출대비인건비↓'&&!D[co.key].emp.total));return miss?`<td style="color:var(--dim)">—</td>`:`<td class="${i===bestIdx?cc[i]+' best':''}">${vFn(co.key)}${i===bestIdx?' ★':''}</td>`}).join('')}</tr>`;
+  }).join('');
+  return `<div class="tbl-card">
+    <div class="tbl-hd">종합 재무 · 수익성 · 인력 · 인건비 비교 (${year}년${reprtLabel !== '사업보고서' ? ` · ${reprtLabel} 기준` : ''})</div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>구분</th><th>항목</th>
+        <th style="color:var(--c1)">풀무원식품</th>
+        <th style="color:var(--c2)">동원F&amp;B</th>
+        <th style="color:var(--c3)">샘표식품</th>
+      </tr></thead>
+      <tbody>${tbody}</tbody>
+    </table></div>
+    <div class="tbl-ft">★ 해당 항목 최고값(유리한 방향 기준) · 별도(OFS) 재무제표 기준 · 출처: DART Open API</div>
+  </div>`;
+}
+
+// ── VERIFY PANEL ─────────────────────────────
+function renderVerify(D, year, reprtLabel) {
+  const fmtRaw = v => {
+    const num = parseInt(String(v||'').replace(/,/g,''));
+    return isNaN(num) ? '-' : num.toLocaleString();
+  };
+  const FIN_ITEMS = [
+    {nm:'매출액',    sj:'IS', re:/수익\(매출액\)|^매출액$/, key:'rev'},
+    {nm:'영업이익',  sj:'IS', re:/^영업이익/,              key:'op' },
+    {nm:'당기순이익',sj:'IS', re:/당기순이익/,             key:'net'},
+    {nm:'자산총계',  sj:'BS', re:/자산총계/,               key:'ta' },
+    {nm:'부채총계',  sj:'BS', re:/부채총계/,               key:'tl' },
+    {nm:'자본총계',  sj:'BS', re:/자본총계/,               key:'eq' },
+  ];
+
+  const sections = COS.map(co => {
+    const finRaw = D[co.key].finRaw || [];
+    const empRaw = D[co.key].empRaw || [];
+    const fin    = D[co.key].fin;
+    const emp    = D[co.key].emp;
+
+    const ofs = finRaw.filter(r => r.fs_div === 'OFS');
+    const used = ofs.length ? ofs : finRaw;
+
+    const finRows = FIN_ITEMS.map(item => {
+      const row    = used.find(r => r.sj_div === item.sj && item.re.test(r.account_nm));
+      const fld    = (_cumulative && item.sj === 'IS' && row && row.thstrm_add_amount) ? 'thstrm_add_amount' : 'thstrm_amount';
+      const rawNum = row ? parseInt(String(row[fld]||'').replace(/,/g,'')) : null;
+      const calc   = fin[item.key]?.c ?? 0;
+      const ok     = rawNum !== null && rawNum === calc;
+      const badge  = rawNum === null
+        ? '<span style="color:var(--neg)">✗ 미매핑</span>'
+        : ok
+          ? '<span style="color:#3DD68C">✓</span>'
+          : '<span style="color:var(--warn)">!</span>';
+      return `<tr>
+        <td>${item.nm}</td>
+        <td>${row ? row.account_nm : '—'}</td>
+        <td>${rawNum !== null ? 억(rawNum) : '—'}</td>
+        <td>${badge} <strong>${억(calc)}</strong></td>
+      </tr>`;
+    }).join('');
+
+    const mRow = empRaw.find(r => r.sexdstn === '남') || {};
+    const fRow = empRaw.find(r => r.sexdstn === '여') || {};
+    const n2 = s => parseInt(String(s||'').replace(/,/g,'')) || 0;
+    const rawSalTot = n2(mRow.fyer_salary_totamt) + n2(fRow.fyer_salary_totamt);
+    const multApplied = rawSalTot > 0 ? Math.round(emp.salTot / rawSalTot) : 1;
+    const unitBadge = multApplied === 1000
+      ? '<span style="background:rgba(245,200,66,.15);color:var(--warn);border-radius:3px;padding:0 5px;font-size:9px">⚠ 천원→원 ×1000 보정됨</span>'
+      : '<span style="background:rgba(61,214,140,.1);color:#3DD68C;border-radius:3px;padding:0 5px;font-size:9px">원 단위 정상</span>';
+
+    const empRows = empRaw.length ? `
+      <tr style="background:rgba(255,255,255,.015)">
+        <td colspan="4" style="font-size:10px;padding-top:9px;color:var(--muted)">임직원 현황 &nbsp;${unitBadge}</td>
+      </tr>
+      <tr><td>인원(남/여)</td><td>sm</td>
+        <td>${mRow.sm||'—'} / ${fRow.sm||'—'}</td>
+        <td><span style="color:#3DD68C">✓</span> ${emp.smM}명 / ${emp.smF}명</td></tr>
+      <tr><td>정규직(남/여)</td><td>rgllbr_co</td>
+        <td>${mRow.rgllbr_co||'—'} / ${fRow.rgllbr_co||'—'}</td>
+        <td>${emp.reg}명 합계</td></tr>
+      <tr><td>총급여(남)</td><td>fyer_salary_totamt</td>
+        <td>${fmtRaw(mRow.fyer_salary_totamt)}</td>
+        <td>${억(emp.salM)}</td></tr>
+      <tr><td>총급여(여)</td><td>fyer_salary_totamt</td>
+        <td>${fmtRaw(fRow.fyer_salary_totamt)}</td>
+        <td>${억(emp.salF)}</td></tr>
+      <tr><td>1인평균(남)</td><td>jan_salary_am</td>
+        <td>${fmtRaw(mRow.jan_salary_am)}</td>
+        <td>${만(emp.avgM)}원/년</td></tr>
+      <tr><td>1인평균(여)</td><td>jan_salary_am</td>
+        <td>${fmtRaw(fRow.jan_salary_am)}</td>
+        <td>${만(emp.avgF)}원/년</td></tr>
+      <tr style="border-top:1px solid var(--border)">
+        <td><strong>1인평균(전체)</strong></td>
+        <td>(남+여) ÷ 2</td>
+        <td>${Math.round((n2(mRow.jan_salary_am)+n2(fRow.jan_salary_am))*multApplied/2).toLocaleString()}</td>
+        <td><strong>${만(emp.avgAll)}원/년</strong></td></tr>
+    ` : `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:10px">임직원 데이터 없음</td></tr>`;
+
+    return `<div class="vfy-sec" style="border-top:3px solid ${co.color}">
+      <div style="font-size:12px;font-weight:700;color:${co.color};margin-bottom:10px">${co.name.replace('&amp;','&')}</div>
+      <table class="vfy-tbl">
+        <thead><tr><th>항목</th><th>DART 계정과목/필드</th><th>DART 원본값</th><th>대시보드 계산값</th></tr></thead>
+        <tbody>${finRows}${empRows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  return `<div id="verify-panel" style="display:none;margin-top:4px">
+    <div class="sec-label">원본 데이터 검증
+      <span style="font-size:10px;font-weight:400;color:var(--dim);margin-left:8px;text-transform:none;letter-spacing:0">${year}년 ${reprtLabel} · 별도(OFS) 기준</span>
+    </div>
+    <div style="background:rgba(74,159,224,.05);border:1px solid rgba(74,159,224,.12);border-radius:8px;padding:9px 14px;font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">
+      재무수치 <strong style="color:var(--text)">DART 원본값</strong>과 대시보드 계산값이 일치하면 <span style="color:#3DD68C">✓</span>,
+      계정 미매핑 <span style="color:var(--neg)">✗</span>, 값 불일치 <span style="color:var(--warn)">!</span> 로 표시됩니다.
+      1인평균(전체) 원본값 = <code style="background:rgba(255,255,255,.06);padding:0 4px;border-radius:3px">(남 jan_salary_am + 여 jan_salary_am) ÷ 2</code>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;margin-top:10px">
+      ${sections}
+    </div>
+  </div>`;
+}
+
+function toggleVerify() {
+  const p = document.getElementById('verify-panel');
+  const b = document.getElementById('vfy-btn');
+  if (!p) return;
+  const show = p.style.display === 'none';
+  p.style.display = show ? 'block' : 'none';
+  b.textContent = show ? '원본 데이터 비교 ▲' : '원본 데이터 비교 ▼';
+}
+
+// ── MAIN LOAD ────────────────────────────────
+async function loadData() {
+  const year = parseInt(document.getElementById('yr').value);
+  document.getElementById('fetch-btn').disabled = true;
+  document.getElementById('err-bar').classList.remove('show');
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('ov-txt').textContent = `${year}년 데이터 불러오는 중...`;
+  document.getElementById('ov-sub').textContent = '';
+
+  const done = () => {
+    document.getElementById('overlay').classList.remove('show');
+    document.getElementById('fetch-btn').disabled = false;
+  };
+
+  let J;
+  try {
+    J = await getJSON(`data/${year}.json`);
+  } catch (e) {
+    done();
+    const yrs = (INDEX?.years || []).map(y => y.year);
+    const eb = document.getElementById('err-bar');
+    eb.innerHTML = `<strong>${year}년 데이터가 없습니다.</strong> 제공 연도: ${yrs.length ? yrs[0] + '~' + yrs[yrs.length-1] : '없음'}`;
+    eb.classList.add('show');
+    document.getElementById('yr-badge').textContent = `${year} 데이터 없음`;
+    document.getElementById('main').innerHTML = '';
+    return;
+  }
+
+  const reprtLabel = J.reprt_label || '사업보고서';
+  _cumulative = J.reprt_code !== '11011';
+  document.getElementById('yr-badge').textContent = `${year} ${reprtLabel}`;
+
+  const D = {};
+  const errs = [];
+  _missing = new Set();
+  for (const co of COS) {
+    const c = J.companies?.[co.key] || {};
+    const nm = co.name.replace('&amp;','&');
+    const fin = c.fin || { status:'', list:[] };
+    const emp = c.emp || { status:'', list:[] };
+    const fList = fin.status === '000' ? (fin.list || []) : [];
+    const eList = emp.status === '000' ? (emp.list || []) : [];
+    if (!fList.length) _missing.add(co.key);
+    if (!fList.length) errs.push(`${nm}: ${fin.message || '재무데이터 없음'}${fin.status ? ' (' + fin.status + ')' : ''}`);
+    D[co.key] = { fin: parseFS(fList), emp: parseEmp(eList), finRaw: fList, empRaw: eList };
+  }
+  done();
+
+  if (errs.length) {
+    const eb = document.getElementById('err-bar');
+    eb.innerHTML = `일부 데이터 없음: ` + errs.join(' / ');
+    eb.classList.add('show');
+  }
+
+  const note = _cumulative
+    ? `<div class="note-bar">${year}년은 아직 사업보고서가 공시되지 않아 <strong>${reprtLabel}</strong> 기준입니다. 손익·인건비는 해당 시점까지의 누적금액이며 연환산하지 않았으므로, 다른 연도(연간)와 직접 비교하지 마세요.</div>`
+    : '';
+
+  document.getElementById('main').innerHTML = `
+    ${note}
+    <div class="kpi-row">${renderKPI(D)}</div>
+    <div class="two">${renderIS(D)}${renderBS(D)}</div>
+    <div class="sec-label">수익성 지표</div>
+    ${renderRatios(D)}
+    <div class="sec-label">인력 현황</div>
+    <div class="three">${renderEmp(D)}</div>
+    <div class="sec-label">인건비 현황</div>
+    <div class="three">${renderSal(D)}</div>
+    ${renderTable(D, year, reprtLabel)}
+    <div style="text-align:center;padding:4px 0 6px">
+      <button id="vfy-btn" onclick="toggleVerify()" style="background:rgba(74,159,224,.12);border:1px solid rgba(74,159,224,.28);color:#7DB8F5;padding:5px 16px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;transition:opacity .15s">
+        원본 데이터 비교 ▼
+      </button>
+    </div>
+    ${renderVerify(D, year, reprtLabel)}
+    <div style="text-align:center;font-size:10px;color:var(--dim)">출처: 금융감독원 DART Open API · ${year}년 데이터 수집 ${J.fetched_at} (KST)</div>
+  `;
+}
+
+function changeYear(delta) {
+  const yrs = (INDEX?.years || []).map(y => y.year);
+  const inp = document.getElementById('yr');
+  const v = parseInt(inp.value) + delta;
+  if (!yrs.length || (v >= yrs[0] && v <= yrs[yrs.length-1])) { inp.value = v; loadData(); }
+}
+
+// 초기 로드: 가장 최근 사업보고서 연도를 기본값으로
+async function init() {
+  try {
+    INDEX = await getJSON('data/index.json');
+  } catch (e) {
+    document.getElementById('main').innerHTML =
+      `<div style="text-align:center;padding:48px;color:var(--muted)">데이터가 아직 준비되지 않았습니다.<br><span style="font-size:11px;color:var(--dim)">GitHub Actions의 데이터 갱신 작업이 한 번 이상 실행되어야 합니다.</span></div>`;
+    return;
+  }
+  const yrs = INDEX.years || [];
+  const annual = yrs.filter(y => y.reprt_code === '11011');
+  const pick = (annual.length ? annual : yrs).slice(-1)[0];
+  const inp = document.getElementById('yr');
+  if (yrs.length) { inp.min = yrs[0].year; inp.max = yrs[yrs.length-1].year; }
+  inp.value = pick ? pick.year : new Date().getFullYear();
+  document.getElementById('upd').textContent = `최종 갱신 ${INDEX.updated_at} KST`;
+  loadData();
+}
+init();
+</script>
+</body>
+</html>
