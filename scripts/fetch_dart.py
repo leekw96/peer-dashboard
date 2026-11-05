@@ -82,9 +82,13 @@ def fetch_year(year, key, reprt_code, reprt_label):
                    reprt_code=reprt_code, fs_div="OFS")
         emp = call("empSttus.json", key, corp_code=co["code"], bsns_year=year,
                    reprt_code=reprt_code)
-        out["companies"][co["key"]] = {"name": co["name"], "fin": fin, "emp": emp}
+        # 전체 재무제표(판관비·대손상각비 등). 용량을 줄이려 손익계산서(IS/CIS)만 보관
+        full = call("fnlttSinglAcntAll.json", key, corp_code=co["code"], bsns_year=year,
+                    reprt_code=reprt_code, fs_div="OFS")
+        full["list"] = [r for r in full["list"] if r.get("sj_div") in ("IS", "CIS")]
+        out["companies"][co["key"]] = {"name": co["name"], "fin": fin, "emp": emp, "full": full}
         print(f"  {year} {reprt_label} {co['name']:<8} 재무 {fin['status']}({len(fin['list'])}) "
-              f"임직원 {emp['status']}({len(emp['list'])})")
+              f"임직원 {emp['status']}({len(emp['list'])}) 전체손익 {full['status']}({len(full['list'])})")
     return out
 
 
@@ -103,7 +107,9 @@ def main():
         # 지난 연도는 사업보고서 기준 파일이 이미 있으면 다시 받지 않음 (정정공시 반영은 REFRESH_ALL=1)
         if path.exists() and not recent and not force_all:
             try:
-                if json.loads(path.read_text(encoding="utf-8")).get("reprt_code") == "11011":
+                old = json.loads(path.read_text(encoding="utf-8"))
+                # 전체 재무제표(full)까지 받아 둔 사업보고서 파일이면 건너뜀
+                if old.get("reprt_code") == "11011" and all("full" in c for c in old["companies"].values()):
                     continue
             except Exception:
                 pass
