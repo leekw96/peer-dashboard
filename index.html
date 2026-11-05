@@ -144,12 +144,14 @@ tr:hover td{background:rgba(255,255,255,.018)}
 .upd{font-size:10.5px;color:var(--muted)}
 .note-bar{background:rgba(245,200,66,.07);border:1px solid rgba(245,200,66,.22);border-radius:7px;padding:7px 12px;color:var(--warn);font-size:11px;line-height:1.5}
 
+.ratio3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px}
 /* MOBILE */
 @media (max-width:900px){
   .kpi-row,.three{grid-template-columns:1fr}
   .two{grid-template-columns:1fr}
 }
 @media (max-width:600px){
+  .ratio3{grid-template-columns:1fr}
   .hdr{padding:12px 16px}
   .wrap{padding:10px 16px 24px}
   #err-bar{margin:10px 16px 0}
@@ -369,7 +371,7 @@ function renderBS(D) {
     <div class="sub" style="margin-top:0">재무구조</div>
     ${structBars}
     <div style="border-top:1px solid var(--border);padding-top:10px">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px">
+      <div class="ratio3">
         <div>
           <div class="sub" style="margin-top:0">부채비율 ↓ <span style="color:var(--dim)">(부채총계 ÷ 자기자본, 기말)</span></div>
           <div class="rb">${COS.map(co=>{const f=D[co.key].fin;const v=f.eq.c?f.tl.c/f.eq.c*100:0;return ratioBar(co,v,Math.max(maxDR,.01),v.toFixed(1)+'%')}).join('')}</div>
@@ -377,6 +379,13 @@ function renderBS(D) {
         <div>
           <div class="sub" style="margin-top:0">유동비율 ↑</div>
           <div class="rb">${COS.map(co=>{const f=D[co.key].fin;const v=f.cl.c?f.ca.c/f.cl.c*100:0;return ratioBar(co,v,Math.max(maxCR,.01),v.toFixed(1)+'%')}).join('')}</div>
+        </div>
+        <div>
+          <div class="sub" style="margin-top:0">차입금의존도 ↓ <span style="color:var(--dim)">(차입금 ÷ 자산총계, 기말)</span></div>
+          <div class="rb">${(() => { const vals = COS.map(co => borrowDepOf(D[co.key])); const mx = Math.max(...vals.filter(v => v !== null).map(v => v * 100), .01);
+            return COS.map((co, i) => vals[i] === null
+              ? `<div class="rr"><span class="rc" style="color:${co.color}">${co.name}</span><div class="rt"></div><span class="rv" style="width:auto;color:var(--dim)">미수집</span></div>`
+              : ratioBar(co, vals[i] * 100, mx, (vals[i] * 100).toFixed(1) + '%')).join(''); })()}</div>
         </div>
       </div>
     </div>
@@ -532,6 +541,19 @@ const sgaLaborOf = d => {
   return l.tot / d.sg.sga.c;
 };
 
+// ── 차입금의존도 = 차입금 ÷ 자산총계(기말) ──
+// 차입금 = 단기차입금 + 유동성장기차입금(유동성장기부채) + 장기차입금 + 사채(전환사채 등 포함), 리스부채 제외
+const BORROW_IN  = /(차입금|사채)$|^유동성장기부채$|^유동성(장기)?차입금|^유동성사채/;
+const BORROW_OUT = /할인|할증|조정|대가|이자|미지급|리스|충당|보증|상환우선/;
+function parseBorrow(rows) {
+  const bs = rows.filter(r => r.sj_div === 'BS');
+  if (!bs.length) return { ok: false, tot: 0, items: [] };
+  const items = bs.filter(r => { const k = (r.account_nm || '').replace(/\s/g, ''); return BORROW_IN.test(k) && !BORROW_OUT.test(k); })
+                  .map(r => ({ nm: r.account_nm, c: n(r.thstrm_amount) }));
+  return { ok: true, tot: items.reduce((a, x) => a + x.c, 0), items };
+}
+const borrowDepOf = d => (_missing.has(d.key) || !d.br || !d.br.ok || !d.fin.ta.c) ? null : d.br.tot / d.fin.ta.c;
+
 // 1인당 영업이익 = 영업이익 ÷ 기말 임직원 수 (DART 직원현황 기준, 임원 제외)
 const opPerHead = d => (d.emp.total && !_missing.has(d.key)) ? d.fin.op.c / d.emp.total : null;
 
@@ -604,6 +626,7 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
     ['',   '영업이익률',  co=>{const v=D[co].fin;return v.rev.c?`<span style="${v.op.c<0?'color:var(--neg)':''}">${(v.op.c/v.rev.c*100).toFixed(1)}%</span>`:'N/A'}, a=>best(COS.map(co=>D[co.key].fin.rev.c?D[co.key].fin.op.c/D[co.key].fin.rev.c:0),false)],
     ['',   '당기순이익',  co=>`<span style="${D[co].fin.net.c<0?'color:var(--neg)':''}">${억(D[co].fin.net.c)}</span>`, a=>best([D.p.fin.net.c,D.d.fin.net.c,D.s.fin.net.c],false)],
     ['안정성','부채비율(기말)↓', co=>{const f=D[co].fin;return f.eq.c?(f.tl.c/f.eq.c*100).toFixed(1)+'%':'N/A'}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.eq.c?f.tl.c/f.eq.c:9999}),true)],
+    ['',     '차입금의존도(기말)↓', co=>{const v=borrowDepOf(D[co]);return v===null?'N/A':(v*100).toFixed(1)+'%'}, a=>best(COS.map(co=>borrowDepOf(D[co.key])??Infinity),true)],
     ['',     '유동비율↑', co=>{const f=D[co].fin;return f.cl.c?(f.ca.c/f.cl.c*100).toFixed(1)+'%':'N/A'}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.cl.c?f.ca.c/f.cl.c:0}),false)],
     ['',     '자기자본비율↑',co=>{const f=D[co].fin;return f.ta.c?(f.eq.c/f.ta.c*100).toFixed(1)+'%':'N/A'},a=>best(COS.map(co=>{const f=D[co.key].fin;return f.ta.c?f.eq.c/f.ta.c:0}),false)],
     ['인력','전체임직원',  co=>`${(D[co].emp.total||0).toLocaleString()}명`, a=>best(COS.map(co=>D[co.key].emp.total),false)],
@@ -626,7 +649,7 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
     if (_cumulative && cat === '급여') return `<tr><td>급여</td><td colspan="${COS.length+1}" style="text-align:left;color:var(--dim)">분기·반기보고서 기준이라 비교하지 않음 (회사별 급여 공시 기간이 달라 왜곡 가능) — 사업보고서 연도에서 확인</td></tr>`;
     if (_cumulative && ['직원급여총액','임원보수총액','임원1인평균보수','총인건비','판관비인건비비율','1인평균급여↑','매출대비급여↓'].includes(item)) return '';
     const bestIdx = bFn(null);
-    return `<tr><td>${cat}</td><td>${item}</td>${COS.map((co,i)=>{const isEmp=['전체임직원','정규직비율','평균근속↑','직원급여총액','1인평균급여↑','총인건비'].includes(item);const miss=(item==='임원보수총액'||item==='임원1인평균보수')?!(D[co.key].ex&&D[co.key].ex.found):item==='판관비인건비비율'?sgaLaborOf(D[co.key])===null:item==='CIR ↓'?cirOf(D[co.key])===null:item==='1인당영업이익↑'?opPerHead(D[co.key])===null:isEmp?!D[co.key].emp.total:(_missing.has(co.key)||(item==='매출대비급여↓'&&!D[co.key].emp.total));return miss?`<td style="color:var(--dim)">—</td>`:`<td class="${i===bestIdx?cc[i]+' best':''}">${vFn(co.key)}${i===bestIdx?' ★':''}</td>`}).join('')}</tr>`;
+    return `<tr><td>${cat}</td><td>${item}</td>${COS.map((co,i)=>{const isEmp=['전체임직원','정규직비율','평균근속↑','직원급여총액','1인평균급여↑','총인건비'].includes(item);const miss=item==='차입금의존도(기말)↓'?borrowDepOf(D[co.key])===null:(item==='임원보수총액'||item==='임원1인평균보수')?!(D[co.key].ex&&D[co.key].ex.found):item==='판관비인건비비율'?sgaLaborOf(D[co.key])===null:item==='CIR ↓'?cirOf(D[co.key])===null:item==='1인당영업이익↑'?opPerHead(D[co.key])===null:isEmp?!D[co.key].emp.total:(_missing.has(co.key)||(item==='매출대비급여↓'&&!D[co.key].emp.total));return miss?`<td style="color:var(--dim)">—</td>`:`<td class="${i===bestIdx?cc[i]+' best':''}">${vFn(co.key)}${i===bestIdx?' ★':''}</td>`}).join('')}</tr>`;
   }).join('');
   return `<div class="tbl-card">
     <div class="tbl-hd">종합 재무 · 수익성 · 인력 · 직원급여 비교 · 단위: 백만원 (${year}년${reprtLabel !== '사업보고서' ? ` · ${reprtLabel} 기준` : ''})</div>
@@ -638,7 +661,7 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
       </tr></thead>
       <tbody>${tbody}</tbody>
     </table></div>
-    <div class="tbl-ft">★ 해당 항목 최고값(유리한 방향 기준) · 별도(OFS) 재무제표 기준 · 부채비율 = 부채총계 ÷ 자기자본(기말잔액) · ROA·ROE 평잔 = (전기말 + 당기말) ÷ 2 · CIR = 판관비 ÷ (판관비 + 대손상각비 + 영업이익), 판관비는 매출총이익 − 영업이익 − 대손상각비(물류비·연구개발비 별도 표시 회사도 포함되도록 통일), 대손상각비는 손익계산서 본문에 별도 표시된 경우만 반영(없으면 판관비에 포함된 것으로 봄) · 1인당 영업이익 = 영업이익 ÷ 기말 직원 수 · 임원 보수 = 이사·감사 전체 보수총액(사외이사·감사 포함) · 판관비인건비비율 = 총인건비(직원 급여총액 + 임원 보수총액) ÷ 판관비. 직원 급여에는 생산직 등 매출원가 인건비도 포함됨 · 출처: DART Open API</div>
+    <div class="tbl-ft">★ 해당 항목 최고값(유리한 방향 기준) · 별도(OFS) 재무제표 기준 · 부채비율 = 부채총계 ÷ 자기자본(기말잔액) · 차입금의존도 = 차입금(단기·장기차입금, 유동성장기부채, 사채 / 리스부채 제외) ÷ 자산총계(기말잔액) · ROA·ROE 평잔 = (전기말 + 당기말) ÷ 2 · CIR = 판관비 ÷ (판관비 + 대손상각비 + 영업이익), 판관비는 매출총이익 − 영업이익 − 대손상각비(물류비·연구개발비 별도 표시 회사도 포함되도록 통일), 대손상각비는 손익계산서 본문에 별도 표시된 경우만 반영(없으면 판관비에 포함된 것으로 봄) · 1인당 영업이익 = 영업이익 ÷ 기말 직원 수 · 임원 보수 = 이사·감사 전체 보수총액(사외이사·감사 포함) · 판관비인건비비율 = 총인건비(직원 급여총액 + 임원 보수총액) ÷ 판관비. 직원 급여에는 생산직 등 매출원가 인건비도 포함됨 · 출처: DART Open API</div>
   </div>`;
 }
 
@@ -697,6 +720,15 @@ function renderVerify(D, year, reprtLabel) {
       <tr><td>대손상각비</td><td>${sg.badFound ? sg.bad.nm : '본문 별도계정 없음'}</td><td>${sg.badFound ? 억(sg.bad.c) : '0 (판관비 포함)'}</td><td></td></tr>
       <tr><td><strong>CIR</strong></td><td>판관비÷(판관비+대손+영업이익)</td><td></td>
         <td><strong>${cirV === null ? '—' : (cirV*100).toFixed(2) + '%'}</strong></td></tr>`;
+    const br = D[co.key].br || { ok:false, items:[] }, bdep = borrowDepOf(D[co.key]);
+    const borrowRows = `
+      <tr style="background:rgba(255,255,255,.015)"><td colspan="4" style="font-size:10px;padding-top:9px;color:var(--muted)">차입금의존도 산출 (전체 재무제표 재무상태표, 기말)</td></tr>
+      ${br.ok ? (br.items.length ? br.items.map(x => `<tr><td>차입금</td><td>${x.nm}</td><td></td><td>${억(x.c)}</td></tr>`).join('')
+                                 : '<tr><td>차입금</td><td colspan="3" style="color:var(--dim)">해당 계정 없음 (무차입)</td></tr>')
+              : '<tr><td>차입금</td><td colspan="3"><span style="color:var(--warn)">재무상태표 미수집</span></td></tr>'}
+      <tr><td><strong>차입금의존도</strong></td><td>차입금 합계 ÷ 자산총계</td>
+        <td>${bdep === null ? '' : 억(br.tot) + ' ÷ ' + 억(D[co.key].fin.ta.c)}</td>
+        <td><strong>${bdep === null ? '—' : (bdep * 100).toFixed(1) + '%'}</strong></td></tr>`;
     const lab = laborOf(D[co.key]), slr = sgaLaborOf(D[co.key]);
     const laborRows = `
       <tr style="background:rgba(255,255,255,.015)"><td colspan="4" style="font-size:10px;padding-top:9px;color:var(--muted)">판관비인건비비율 산출</td></tr>
@@ -751,7 +783,7 @@ function renderVerify(D, year, reprtLabel) {
       <div style="font-size:12px;font-weight:700;color:${co.color};margin-bottom:10px">${co.name.replace('&amp;','&')}</div>
       <table class="vfy-tbl">
         <thead><tr><th>항목</th><th>DART 계정과목/필드</th><th>DART 원본값</th><th>대시보드 계산값</th></tr></thead>
-        <tbody>${finRows}${sgaRows}${laborRows}${empRows}</tbody>
+        <tbody>${finRows}${borrowRows}${sgaRows}${laborRows}${empRows}</tbody>
       </table>
     </div>`;
   }).join('');
@@ -830,7 +862,7 @@ async function loadData() {
     if (!fList.length) errs.push(`${nm}: ${fin.message || '재무데이터 없음'}${fin.status ? ' (' + fin.status + ')' : ''}`);
     const finP = parseFS(fList), sgP = parseSGA(aList);
     if (!finP.op.nm && sgP.opFound) { finP.op = { c: sgP.op.c, p: sgP.op.p, nm: '전체재무제표', filled: true }; }
-    D[co.key] = { key: co.key, fin: finP, emp: parseEmp(eList), sg: sgP, ex: parseExec(xList), finRaw: fList, empRaw: eList };
+    D[co.key] = { key: co.key, fin: finP, emp: parseEmp(eList), sg: sgP, ex: parseExec(xList), br: parseBorrow(aList), finRaw: fList, empRaw: eList };
   }
   done();
 
