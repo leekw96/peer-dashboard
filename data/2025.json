@@ -2,7 +2,7 @@
  "year": 2025,
  "reprt_code": "11011",
  "reprt_label": "사업보고서",
- "fetched_at": "2026-11-05 13:26",
+ "fetched_at": "2026-11-05 13:44",
  "companies": {
   "p": {
    "name": "풀무원식품",
@@ -1235,6 +1235,30 @@
       "currency": "KRW"
      }
     ]
+   },
+   "exec": {
+    "status": "000",
+    "message": "정상",
+    "list": [
+     {
+      "rcept_no": "20260323001555",
+      "corp_cls": "E",
+      "corp_code": "00684732",
+      "corp_name": "풀무원식품",
+      "nmpr": "5",
+      "jan_avrg_mendng_am": "38,000,000",
+      "mendng_totamt": "190,000,000",
+      "rm": "-",
+      "stlm_dt": "2025-12-31",
+      "fscl_year": "-",
+      "stk_bsd_pd_mendng_totamt": "-",
+      "stk_opt_exrcsbl_qty": "-",
+      "stk_opt_unexrcsbl_qty": "-",
+      "stk_opt_rmn_blce": "-",
+      "othr_stk_bsd_cmpn_unpyd_qty": "-",
+      "othr_stk_bsd_cmpn_mkt_vl": "-"
+     }
+    ]
    }
   },
   "d": {
@@ -2352,6 +2376,30 @@
       "bfefrmtrm_amount": "1989216429980",
       "ord": "22",
       "currency": "KRW"
+     }
+    ]
+   },
+   "exec": {
+    "status": "000",
+    "message": "정상",
+    "list": [
+     {
+      "rcept_no": "20260319000629",
+      "corp_cls": "E",
+      "corp_code": "00340917",
+      "corp_name": "동원F&B",
+      "nmpr": "5",
+      "jan_avrg_mendng_am": "277,000,000",
+      "mendng_totamt": "1,383,000,000",
+      "rm": "-",
+      "stlm_dt": "2025-12-31",
+      "fscl_year": "-",
+      "stk_bsd_pd_mendng_totamt": "-",
+      "stk_opt_exrcsbl_qty": "-",
+      "stk_opt_unexrcsbl_qty": "-",
+      "stk_opt_rmn_blce": "-",
+      "othr_stk_bsd_cmpn_unpyd_qty": "-",
+      "othr_stk_bsd_cmpn_mkt_vl": "-"
      }
     ]
    }
@@ -3505,6 +3553,30 @@
       "bfefrmtrm_amount": "371172634015",
       "ord": "26",
       "currency": "KRW"
+     }
+    ]
+   },
+   "exec": {
+    "status": "000",
+    "message": "정상",
+    "list": [
+     {
+      "rcept_no": "20260515000077",
+      "corp_cls": "Y",
+      "corp_code": "01167056",
+      "corp_name": "샘표식품",
+      "nmpr": "4",
+      "jan_avrg_mendng_am": "360,287,000",
+      "mendng_totamt": "1,441,150,000",
+      "rm": "-",
+      "stlm_dt": "2025-12-31",
+      "fscl_year": "-",
+      "stk_bsd_pd_mendng_totamt": "-",
+      "stk_opt_exrcsbl_qty": "-",
+      "stk_opt_unexrcsbl_qty": "-",
+      "stk_opt_rmn_blce": "-",
+      "othr_stk_bsd_cmpn_unpyd_qty": "-",
+      "othr_stk_bsd_cmpn_mkt_vl": "-"
      }
     ]
    }

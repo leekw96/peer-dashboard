@@ -2,7 +2,7 @@
  "year": 2024,
  "reprt_code": "11011",
  "reprt_label": "사업보고서",
- "fetched_at": "2026-11-05 13:25",
+ "fetched_at": "2026-11-05 13:44",
  "companies": {
   "p": {
    "name": "풀무원식품",
@@ -1235,6 +1235,30 @@
       "currency": "KRW"
      }
     ]
+   },
+   "exec": {
+    "status": "000",
+    "message": "정상",
+    "list": [
+     {
+      "rcept_no": "20250318001279",
+      "corp_cls": "E",
+      "corp_code": "00684732",
+      "corp_name": "풀무원식품",
+      "nmpr": "6",
+      "jan_avrg_mendng_am": "194,000,000",
+      "mendng_totamt": "1,162,000,000",
+      "rm": "-",
+      "stlm_dt": "2024-12-31",
+      "fscl_year": "-",
+      "stk_bsd_pd_mendng_totamt": "-",
+      "stk_opt_exrcsbl_qty": "-",
+      "stk_opt_unexrcsbl_qty": "-",
+      "stk_opt_rmn_blce": "-",
+      "othr_stk_bsd_cmpn_unpyd_qty": "-",
+      "othr_stk_bsd_cmpn_mkt_vl": "-"
+     }
+    ]
    }
   },
   "d": {
@@ -2397,6 +2421,30 @@
       "currency": "KRW"
      }
     ]
+   },
+   "exec": {
+    "status": "000",
+    "message": "정상",
+    "list": [
+     {
+      "rcept_no": "20250318001158",
+      "corp_cls": "E",
+      "corp_code": "00340917",
+      "corp_name": "동원F&B",
+      "nmpr": "5",
+      "jan_avrg_mendng_am": "302,000,000",
+      "mendng_totamt": "1,509,000,000",
+      "rm": "-",
+      "stlm_dt": "2024-12-31",
+      "fscl_year": "-",
+      "stk_bsd_pd_mendng_totamt": "-",
+      "stk_opt_exrcsbl_qty": "-",
+      "stk_opt_unexrcsbl_qty": "-",
+      "stk_opt_rmn_blce": "-",
+      "othr_stk_bsd_cmpn_unpyd_qty": "-",
+      "othr_stk_bsd_cmpn_mkt_vl": "-"
+     }
+    ]
    }
   },
   "s": {
@@ -3548,6 +3596,30 @@
       "bfefrmtrm_amount": "362553052018",
       "ord": "26",
       "currency": "KRW"
+     }
+    ]
+   },
+   "exec": {
+    "status": "000",
+    "message": "정상",
+    "list": [
+     {
+      "rcept_no": "20250314000817",
+      "corp_cls": "Y",
+      "corp_code": "01167056",
+      "corp_name": "샘표식품",
+      "nmpr": "5",
+      "jan_avrg_mendng_am": "305,733,000",
+      "mendng_totamt": "1,528,666,000",
+      "rm": "-",
+      "stlm_dt": "2024-12-31",
+      "fscl_year": "-",
+      "stk_bsd_pd_mendng_totamt": "-",
+      "stk_opt_exrcsbl_qty": "-",
+      "stk_opt_unexrcsbl_qty": "-",
+      "stk_opt_rmn_blce": "-",
+      "othr_stk_bsd_cmpn_unpyd_qty": "-",
+      "othr_stk_bsd_cmpn_mkt_vl": "-"
      }
     ]
    }

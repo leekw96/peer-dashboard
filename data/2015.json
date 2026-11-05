@@ -2,7 +2,7 @@
  "year": 2015,
  "reprt_code": "11011",
  "reprt_label": "사업보고서",
- "fetched_at": "2026-11-05 13:22",
+ "fetched_at": "2026-11-05 13:40",
  "companies": {
   "p": {
    "name": "풀무원식품",
@@ -946,6 +946,30 @@
       "bfefrmtrm_amount": "-70",
       "ord": "21",
       "currency": "KRW"
+     }
+    ]
+   },
+   "exec": {
+    "status": "000",
+    "message": "정상",
+    "list": [
+     {
+      "rcept_no": "20160516003410",
+      "corp_cls": "E",
+      "corp_code": "00684732",
+      "corp_name": "풀무원식품",
+      "nmpr": "5",
+      "jan_avrg_mendng_am": "134,000,000",
+      "mendng_totamt": "537,000,000",
+      "rm": "-",
+      "stlm_dt": "2015-12-31",
+      "fscl_year": "-",
+      "stk_bsd_pd_mendng_totamt": "-",
+      "stk_opt_exrcsbl_qty": "-",
+      "stk_opt_unexrcsbl_qty": "-",
+      "stk_opt_rmn_blce": "-",
+      "othr_stk_bsd_cmpn_unpyd_qty": "-",
+      "othr_stk_bsd_cmpn_mkt_vl": "-"
      }
     ]
    }
@@ -1963,6 +1987,30 @@
       "currency": "KRW"
      }
     ]
+   },
+   "exec": {
+    "status": "000",
+    "message": "정상",
+    "list": [
+     {
+      "rcept_no": "20160328000777",
+      "corp_cls": "E",
+      "corp_code": "00340917",
+      "corp_name": "동원F&B",
+      "nmpr": "5",
+      "jan_avrg_mendng_am": "197,000,000",
+      "mendng_totamt": "988,000,000",
+      "rm": "-",
+      "stlm_dt": "2015-12-31",
+      "fscl_year": "-",
+      "stk_bsd_pd_mendng_totamt": "-",
+      "stk_opt_exrcsbl_qty": "-",
+      "stk_opt_unexrcsbl_qty": "-",
+      "stk_opt_rmn_blce": "-",
+      "othr_stk_bsd_cmpn_unpyd_qty": "-",
+      "othr_stk_bsd_cmpn_mkt_vl": "-"
+     }
+    ]
    }
   },
   "s": {
@@ -1978,6 +2026,11 @@
     "list": []
    },
    "full": {
+    "status": "013",
+    "message": "조회된 데이타가 없습니다.",
+    "list": []
+   },
+   "exec": {
     "status": "013",
     "message": "조회된 데이타가 없습니다.",
     "list": []
