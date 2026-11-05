@@ -1,0 +1,56 @@
+name: DART 데이터 갱신 및 배포
+
+on:
+  schedule:
+    - cron: "17 22 * * *"   # 매일 07:17 KST (UTC 22:17)
+  workflow_dispatch:
+    inputs:
+      refresh_all:
+        description: "지난 연도까지 전부 다시 받기 (정정공시 반영)"
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths-ignore: ["data/**"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: DART 데이터 수집
+        env:
+          DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          REFRESH_ALL: ${{ inputs.refresh_all && '1' || '0' }}
+        run: python scripts/fetch_dart.py
+
+      - name: 변경된 데이터 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          git diff --cached --quiet || git commit -m "DART 데이터 갱신 $(TZ=Asia/Seoul date +'%Y-%m-%d')"
+          git push
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
