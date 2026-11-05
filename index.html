@@ -371,7 +371,7 @@ function renderBS(D) {
     <div style="border-top:1px solid var(--border);padding-top:10px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:11px">
         <div>
-          <div class="sub" style="margin-top:0">부채비율 ↓</div>
+          <div class="sub" style="margin-top:0">부채비율 ↓ <span style="color:var(--dim)">(부채총계 ÷ 자기자본, 기말)</span></div>
           <div class="rb">${COS.map(co=>{const f=D[co.key].fin;const v=f.eq.c?f.tl.c/f.eq.c*100:0;return ratioBar(co,v,Math.max(maxDR,.01),v.toFixed(1)+'%')}).join('')}</div>
         </div>
         <div>
@@ -603,7 +603,7 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
     ['',   '영업이익',    co=>`<span style="${D[co].fin.op.c<0?'color:var(--neg)':''}">${억(D[co].fin.op.c)}</span>`, a=>best([D.p.fin.op.c,D.d.fin.op.c,D.s.fin.op.c],false)],
     ['',   '영업이익률',  co=>{const v=D[co].fin;return v.rev.c?`<span style="${v.op.c<0?'color:var(--neg)':''}">${(v.op.c/v.rev.c*100).toFixed(1)}%</span>`:'N/A'}, a=>best(COS.map(co=>D[co.key].fin.rev.c?D[co.key].fin.op.c/D[co.key].fin.rev.c:0),false)],
     ['',   '당기순이익',  co=>`<span style="${D[co].fin.net.c<0?'color:var(--neg)':''}">${억(D[co].fin.net.c)}</span>`, a=>best([D.p.fin.net.c,D.d.fin.net.c,D.s.fin.net.c],false)],
-    ['안정성','부채비율↓', co=>{const f=D[co].fin;return f.eq.c?(f.tl.c/f.eq.c*100).toFixed(1)+'%':'N/A'}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.eq.c?f.tl.c/f.eq.c:9999}),true)],
+    ['안정성','부채비율(기말)↓', co=>{const f=D[co].fin;return f.eq.c?(f.tl.c/f.eq.c*100).toFixed(1)+'%':'N/A'}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.eq.c?f.tl.c/f.eq.c:9999}),true)],
     ['',     '유동비율↑', co=>{const f=D[co].fin;return f.cl.c?(f.ca.c/f.cl.c*100).toFixed(1)+'%':'N/A'}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.cl.c?f.ca.c/f.cl.c:0}),false)],
     ['',     '자기자본비율↑',co=>{const f=D[co].fin;return f.ta.c?(f.eq.c/f.ta.c*100).toFixed(1)+'%':'N/A'},a=>best(COS.map(co=>{const f=D[co.key].fin;return f.ta.c?f.eq.c/f.ta.c:0}),false)],
     ['인력','전체임직원',  co=>`${(D[co].emp.total||0).toLocaleString()}명`, a=>best(COS.map(co=>D[co.key].emp.total),false)],
@@ -638,7 +638,7 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
       </tr></thead>
       <tbody>${tbody}</tbody>
     </table></div>
-    <div class="tbl-ft">★ 해당 항목 최고값(유리한 방향 기준) · 별도(OFS) 재무제표 기준 · ROA·ROE 평잔 = (전기말 + 당기말) ÷ 2 · CIR = 판관비 ÷ (판관비 + 대손상각비 + 영업이익), 판관비는 매출총이익 − 영업이익 − 대손상각비(물류비·연구개발비 별도 표시 회사도 포함되도록 통일), 대손상각비는 손익계산서 본문에 별도 표시된 경우만 반영(없으면 판관비에 포함된 것으로 봄) · 1인당 영업이익 = 영업이익 ÷ 기말 직원 수 · 임원 보수 = 이사·감사 전체 보수총액(사외이사·감사 포함) · 판관비인건비비율 = 총인건비(직원 급여총액 + 임원 보수총액) ÷ 판관비. 직원 급여에는 생산직 등 매출원가 인건비도 포함됨 · 출처: DART Open API</div>
+    <div class="tbl-ft">★ 해당 항목 최고값(유리한 방향 기준) · 별도(OFS) 재무제표 기준 · 부채비율 = 부채총계 ÷ 자기자본(기말잔액) · ROA·ROE 평잔 = (전기말 + 당기말) ÷ 2 · CIR = 판관비 ÷ (판관비 + 대손상각비 + 영업이익), 판관비는 매출총이익 − 영업이익 − 대손상각비(물류비·연구개발비 별도 표시 회사도 포함되도록 통일), 대손상각비는 손익계산서 본문에 별도 표시된 경우만 반영(없으면 판관비에 포함된 것으로 봄) · 1인당 영업이익 = 영업이익 ÷ 기말 직원 수 · 임원 보수 = 이사·감사 전체 보수총액(사외이사·감사 포함) · 판관비인건비비율 = 총인건비(직원 급여총액 + 임원 보수총액) ÷ 판관비. 직원 급여에는 생산직 등 매출원가 인건비도 포함됨 · 출처: DART Open API</div>
   </div>`;
 }
 
