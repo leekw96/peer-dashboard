@@ -145,6 +145,14 @@ tr:hover td{background:rgba(255,255,255,.018)}
 .note-bar{background:rgba(245,200,66,.07);border:1px solid rgba(245,200,66,.22);border-radius:7px;padding:7px 12px;color:var(--warn);font-size:11px;line-height:1.5}
 
 .ratio3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px}
+/* 자동 점검 */
+.chk-badge{padding:3px 9px;border-radius:5px;font-size:10.5px;cursor:pointer;border:1px solid}
+.chk-err{background:rgba(244,111,111,.12);border-color:rgba(244,111,111,.35);color:var(--neg)}
+.chk-warn{background:rgba(245,200,66,.08);border-color:rgba(245,200,66,.3);color:var(--warn)}
+.chk-ok{background:rgba(61,214,140,.08);border-color:rgba(61,214,140,.3);color:var(--pos)}
+.chk-panel{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 13px}
+.chk-head{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted);cursor:pointer;gap:10px;flex-wrap:wrap}
+.chk-panel .vfy-tbl td:nth-child(2),.chk-panel .vfy-tbl td:nth-child(3){font-size:11px}
 /* MOBILE */
 @media (max-width:900px){
   .kpi-row,.three{grid-template-columns:1fr}
@@ -176,6 +184,7 @@ tr:hover td{background:rgba(255,255,255,.018)}
     </div>
     <button class="fetch-btn" id="fetch-btn" onclick="loadData()">조회</button>
     <span class="badge-yr" id="yr-badge">-</span>
+    <span class="chk-badge" id="chk-badge" style="display:none" onclick="toggleChecks()"></span>
     <span class="upd" id="upd"></span>
   </div>
 </div>
@@ -821,6 +830,135 @@ function toggleVerify() {
   b.textContent = show ? '원본 데이터 비교 ▲' : '원본 데이터 비교 ▼';
 }
 
+// ── 회사별 데이터 구성 (화면·점검 공용) ──
+function buildCompany(co, c) {
+  const fin = c.fin || { status:'', list:[] };
+  const emp = c.emp || { status:'', list:[] };
+  const full = c.full || { status:'', list:[] };
+  const exR = c.exec || { status:'', list:[] };
+  const fList = fin.status === '000' ? (fin.list || []) : [];
+  const aList = full.status === '000' ? (full.list || []) : [];
+  const xList = exR.status === '000' ? (exR.list || []) : [];
+  const eList = emp.status === '000' ? (emp.list || []) : [];
+  if (!fList.length) _missing.add(co.key);
+  const finP = parseFS(fList), sgP = parseSGA(aList);
+  if (!finP.op.nm && sgP.opFound) { finP.op = { c: sgP.op.c, p: sgP.op.p, nm: '전체재무제표', filled: true }; }
+  return { key: co.key, fin: finP, emp: parseEmp(eList), sg: sgP, ex: parseExec(xList), br: parseBorrow(aList),
+           finRaw: fList, empRaw: eList,
+           src: { fin: fin.status, emp: emp.status, full: c.full ? full.status : null, exec: c.exec ? exR.status : null } };
+}
+
+// 점검용 수치 묶음 (현재 전역 상태 기준으로 계산)
+function snap(d) {
+  return {
+    has: !_missing.has(d.key),
+    rev: d.fin.rev.c, ta: d.fin.ta.c, tl: d.fin.tl.c, eq: d.fin.eq.c, op: d.fin.op.c,
+    sga: d.sg && d.sg.ok ? d.sg.sga.c : null,
+    sal: d.emp.total ? d.emp.salTot : null, head: d.emp.total || null, avgPay: d.emp.total ? d.emp.avgAll : null,
+    exe: d.ex && d.ex.found ? d.ex.tot : null,
+    borrow: d.br && d.br.ok ? d.br.tot : null,
+    cir: cirOf(d), sgaLabor: sgaLaborOf(d), borrowDep: borrowDepOf(d),
+  };
+}
+
+// 다른 연도 파일을 같은 함수로 계산 (전역 _cumulative·_missing 임시 전환 후 복원)
+function snapshotYear(Jx) {
+  const saveC = _cumulative, saveM = _missing;
+  _cumulative = Jx.reprt_code !== '11011'; _missing = new Set();
+  const out = {};
+  COS.forEach(co => { const d = buildCompany(co, Jx.companies?.[co.key] || {}); out[co.key] = snap(d); });
+  _cumulative = saveC; _missing = saveM;
+  return out;
+}
+
+// ── 점검 규칙 ──
+// lv: 'err' 누락·검산 오류(반드시 확인) / 'warn' 급변·범위 이탈(확인 권장) / 'info' 참고
+function runChecks(J, D, prev, year) {
+  const out = [];
+  const add = (co, lv, item, msg) => out.push({ co: co.name.replace('&amp;', '&'), color: co.color, lv, item, msg });
+  const pct = (a, b) => ((a / b - 1) * 100);
+  const M = v => 억(v);
+  COS.forEach(co => {
+    const d = D[co.key], s = snap(d), sr = d.src;
+    if (!s.has) { add(co, 'info', '공시', `DART에 ${year}년 재무데이터 없음 (${sr.fin || '미수집'})`); return; }
+
+    [['rev', '매출액'], ['op', '영업이익'], ['net', '당기순이익'], ['ta', '자산총계'], ['tl', '부채총계'], ['eq', '자본총계']].forEach(([k, nm]) => {
+      if (k === 'op' && d.fin.op.filled) { add(co, 'info', nm, '주요계정에 없어 전체 재무제표 값으로 보완'); return; }
+      if (!d.fin[k].nm) add(co, 'err', nm, '주요계정 미매핑 → 화면에 0으로 표시됨');
+    });
+    if (sr.full === null) add(co, 'warn', '전체 재무제표', '미수집 → CIR·차입금의존도 산출 불가 (워크플로 재실행 필요)');
+    else if (sr.full === '000' && !(d.sg && d.sg.ok)) add(co, 'err', '판관비', '전체 재무제표에서 판관비 산출 불가');
+    if (sr.full === '000' && d.br && !d.br.ok) add(co, 'warn', '차입금', '재무상태표 미수집');
+    if (sr.emp !== '000') add(co, 'warn', '직원 현황', `미수집 (${sr.emp || '없음'})`);
+    if (sr.exec === null) add(co, 'warn', '임원 보수', '미수집 (워크플로 재실행 필요)');
+    else if (sr.exec !== '000') add(co, 'info', '임원 보수', `DART 조회 결과 없음 (${sr.exec})`);
+
+    if (s.ta && Math.abs(s.ta - (s.tl + s.eq)) / s.ta > 0.001)
+      add(co, 'err', '재무상태표 검산', `자산총계 ${M(s.ta)} ≠ 부채 ${M(s.tl)} + 자본 ${M(s.eq)}`);
+
+    if (d.emp.total && d.empRaw.length) {
+      const raw = d.empRaw.reduce((a, r) => a + n(r.fyer_salary_totamt), 0);
+      if (raw && Math.round(d.emp.salTot / raw) === 1000) add(co, 'info', '직원 급여', 'DART가 천원 단위로 공시 → ×1,000 보정');
+    }
+    if (d.ex && d.ex.found && d.ex.mult !== 1) add(co, 'info', '임원 보수', `DART가 ${d.ex.mult === 1e6 ? '백만원' : '천원'} 단위로 공시 → 원 단위로 보정`);
+    if (d.sg && d.sg.ok && d.sg.method === 'gp' && d.sg.line && d.sg.line.nm && s.sga && Math.abs(s.sga - d.sg.line.c) / s.sga > 0.01)
+      add(co, 'info', '판관비', `계정값 ${M(d.sg.line.c)} → 산출값 ${M(s.sga)} 사용${d.sg.extras && d.sg.extras.length ? ' (별도 표시: ' + d.sg.extras.join('·') + ')' : ''}`);
+    if (d.br && d.br.ok && !d.br.items.length) add(co, 'info', '차입금', '재무상태표에 차입금·사채 계정 없음 → 0으로 처리');
+
+    if (!_cumulative && s.avgPay !== null && (s.avgPay < 20e6 || s.avgPay > 200e6))
+      add(co, 'warn', '1인평균급여', `${payFmt(s.avgPay)} — 통상 범위(20~200백만원) 밖, 단위·인원 확인`);
+    if (!_cumulative && s.sgaLabor !== null && s.sgaLabor > 1) add(co, 'warn', '판관비인건비비율', `${(s.sgaLabor * 100).toFixed(1)}% — 100% 초과`);
+    if (s.cir !== null && s.cir > 1) add(co, 'info', 'CIR', `${(s.cir * 100).toFixed(1)}% — 영업손실로 100% 초과`);
+    if (s.borrowDep !== null && s.borrowDep > 0.6) add(co, 'warn', '차입금의존도', `${(s.borrowDep * 100).toFixed(1)}% — 60% 초과, 계정 중복 여부 확인`);
+
+    const p = prev && prev[co.key];
+    if (p && p.has) {
+      const items = [['rev', '매출액'], ['ta', '자산총계'], ['sga', '판관비(산출)'], ['sal', '직원 급여총액'], ['head', '직원 수'], ['exe', '임원 보수총액'], ['borrow', '차입금·사채']];
+      items.forEach(([k, nm]) => {
+        const a = s[k], b = p[k];
+        if (a === null || b === null) return;
+        const fmt = v => k === 'head' ? v.toLocaleString() + '명' : M(v);
+        if (b > 0 && a === 0) add(co, 'warn', nm, `전년 ${fmt(b)} → 0 (계정 누락 가능성)`);
+        else if (b > 0 && Math.abs(pct(a, b)) >= 50) add(co, 'warn', nm, `전년 대비 ${pct(a, b) > 0 ? '+' : ''}${pct(a, b).toFixed(0)}% (${fmt(b)} → ${fmt(a)})`);
+      });
+    }
+  });
+  if (_cumulative) out.push({ co: '공통', color: 'var(--muted)', lv: 'info', item: '전년 대비', msg: '분기·반기보고서는 전년(연간)과 기간이 달라 급변 점검 생략' });
+  else if (!prev) out.push({ co: '공통', color: 'var(--muted)', lv: 'info', item: '전년 대비', msg: `${year - 1}년 사업보고서 데이터가 없어 급변 점검 생략` });
+  return out;
+}
+
+const LV = { err: { t: '오류', c: 'var(--neg)' }, warn: { t: '확인', c: 'var(--warn)' }, info: { t: '참고', c: 'var(--muted)' } };
+function renderCheckBadge(ch) {
+  const e = ch.filter(x => x.lv === 'err').length, w = ch.filter(x => x.lv === 'warn').length;
+  const b = document.getElementById('chk-badge');
+  b.style.display = 'inline-block';
+  b.className = 'chk-badge ' + (e ? 'chk-err' : w ? 'chk-warn' : 'chk-ok');
+  b.textContent = e || w ? `⚠ 점검 ${[e ? '오류 ' + e : '', w ? '확인 ' + w : ''].filter(Boolean).join(' · ')}` : '✓ 이상 없음';
+}
+function renderChecks(ch, year) {
+  const e = ch.filter(x => x.lv === 'err').length, w = ch.filter(x => x.lv === 'warn').length, i = ch.filter(x => x.lv === 'info').length;
+  const order = { err: 0, warn: 1, info: 2 };
+  const rows = ch.slice().sort((a, b) => order[a.lv] - order[b.lv]).map(x =>
+    `<tr><td style="color:${LV[x.lv].c};font-weight:700;white-space:nowrap">${LV[x.lv].t}</td><td style="color:${x.color};white-space:nowrap">${x.co}</td><td style="white-space:nowrap">${x.item}</td><td>${x.msg}</td></tr>`).join('');
+  return `<div class="chk-panel" id="chk-panel">
+    <div class="chk-head" onclick="toggleChecks()">
+      <span><strong>자동 점검</strong> · ${year}년 데이터</span>
+      <span><span style="color:var(--neg)">오류 ${e}</span> · <span style="color:var(--warn)">확인 ${w}</span> · <span style="color:var(--muted)">참고 ${i}</span> <span id="chk-arrow">${e ? '▲' : '▼'}</span></span>
+    </div>
+    <div id="chk-body" style="display:${e ? 'block' : 'none'}">
+      <div style="overflow-x:auto"><table class="vfy-tbl" style="margin-top:8px"><thead><tr><th>수준</th><th>회사</th><th>항목</th><th>내용</th></tr></thead><tbody>${rows || '<tr><td colspan="4">점검 항목 없음</td></tr>'}</tbody></table></div>
+      <div style="font-size:10px;color:var(--dim);margin-top:6px;line-height:1.6">오류: 화면 수치가 틀릴 수 있음, 반드시 확인 · 확인: 전년 대비 ±50% 이상 변동·통상 범위 이탈, 공시 원문 확인 권장 · 참고: 보정·기준 적용 내역</div>
+    </div>
+  </div>`;
+}
+function toggleChecks() {
+  const b = document.getElementById('chk-body'); if (!b) return;
+  const show = b.style.display === 'none'; b.style.display = show ? 'block' : 'none';
+  document.getElementById('chk-arrow').textContent = show ? '▲' : '▼';
+  if (show) document.getElementById('chk-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 // ── MAIN LOAD ────────────────────────────────
 async function loadData() {
   const year = parseInt(document.getElementById('yr').value);
@@ -860,20 +998,20 @@ async function loadData() {
     const c = J.companies?.[co.key] || {};
     const nm = co.name.replace('&amp;','&');
     const fin = c.fin || { status:'', list:[] };
-    const emp = c.emp || { status:'', list:[] };
-    const fList = fin.status === '000' ? (fin.list || []) : [];
-    const full = c.full || { status:'', list:[] };
-    const aList = full.status === '000' ? (full.list || []) : [];
-    const exR = c.exec || { status:'', list:[] };
-    const xList = exR.status === '000' ? (exR.list || []) : [];
-    const eList = emp.status === '000' ? (emp.list || []) : [];
-    if (!fList.length) _missing.add(co.key);
-    if (!fList.length) errs.push(`${nm}: ${fin.message || '재무데이터 없음'}${fin.status ? ' (' + fin.status + ')' : ''}`);
-    const finP = parseFS(fList), sgP = parseSGA(aList);
-    if (!finP.op.nm && sgP.opFound) { finP.op = { c: sgP.op.c, p: sgP.op.p, nm: '전체재무제표', filled: true }; }
-    D[co.key] = { key: co.key, fin: finP, emp: parseEmp(eList), sg: sgP, ex: parseExec(xList), br: parseBorrow(aList), finRaw: fList, empRaw: eList };
+    D[co.key] = buildCompany(co, c);
+    if (!D[co.key].finRaw.length) errs.push(`${nm}: ${fin.message || '재무데이터 없음'}${fin.status ? ' (' + fin.status + ')' : ''}`);
   }
   done();
+
+  // ── 자동 점검: 전년도(사업보고서끼리만 비교) 데이터를 같은 함수로 계산해 비교 ──
+  let prevSnap = null;
+  if (!_cumulative) {
+    try {
+      const Jp = await getJSON(`data/${year - 1}.json`);
+      if (Jp.reprt_code === '11011') prevSnap = snapshotYear(Jp);
+    } catch (e) { /* 전년도 파일 없음 */ }
+  }
+  const CHECKS = runChecks(J, D, prevSnap, year);
 
   if (errs.length) {
     const eb = document.getElementById('err-bar');
@@ -890,8 +1028,10 @@ async function loadData() {
     : `<div class="sec-label">직원 급여 현황</div>
     <div class="three">${renderSal(D)}</div>`;
 
+  renderCheckBadge(CHECKS);
   document.getElementById('main').innerHTML = `
     ${note}
+    ${renderChecks(CHECKS, year)}
     <div class="kpi-row">${renderKPI(D)}</div>
     <div class="two">${renderIS(D)}${renderBS(D)}</div>
     <div class="sec-label">수익성 지표</div>
