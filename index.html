@@ -255,7 +255,7 @@ function parseEmp(rows) {
     ctrt: n(M.cnttk_co) + n(F.cnttk_co),
     salTot: salTot * mult, salM: salM * mult, salF: salF * mult,
     avgM: rawAvgM * mult, avgF: rawAvgF * mult,
-    avgAll: (rawAvgM && rawAvgF) ? Math.round((rawAvgM + rawAvgF) * mult / 2) : (total ? Math.round(salTot * mult / total) : 0),
+    avgAll: total ? Math.round(salTot * mult / total) : 0,   // 급여총액 ÷ 인원 (남녀 인원 가중)
     tenM: f(M.avrg_cnwk_sdytrn), tenF: f(F.avrg_cnwk_sdytrn),
     tenAvg: total ? (f(M.avrg_cnwk_sdytrn)*smM + f(F.avrg_cnwk_sdytrn)*smF) / total : 0,
   };
@@ -428,7 +428,7 @@ function renderSal(D) {
     const e = D[co.key].emp, f = D[co.key].fin;
     if (!e.total) return `<div class="sal-card" style="border-top:3px solid ${co.color}">
       <div class="ech"><div class="dot" style="background:${co.color}"></div><span style="font-size:13px;font-weight:700">${co.name}</span></div>
-      <div class="ecb" style="color:var(--muted);font-size:12px;padding:20px;text-align:center">인건비 데이터 없음</div>
+      <div class="ecb" style="color:var(--muted);font-size:12px;padding:20px;text-align:center">급여 데이터 없음</div>
     </div>`;
     const salRatPct = f.rev.c > 0 ? e.salTot/f.rev.c*100 : 0;
     const ratioBarsHtml = COS.map(c2=>{
@@ -441,8 +441,8 @@ function renderSal(D) {
         <span style="font-size:13px;font-weight:700">${co.name}</span></div>
       <div class="ecb">
         <div class="big-n" style="color:${co.color}">${억(e.salTot)}</div>
-        <div class="sub2">연간 인건비 총액</div>
-        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">매출 대비 인건비율</div>
+        <div class="sub2">연간 직원 급여총액 (임원 보수 별도)</div>
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px">매출 대비 직원급여 비율</div>
         <div style="font-size:16px;font-weight:700;margin-bottom:7px">${salRatPct.toFixed(2)}%</div>
         <div class="rb" style="margin-bottom:2px">${ratioBarsHtml}</div>
         <div class="sg">
@@ -458,7 +458,7 @@ function renderSal(D) {
   }).join('');
 }
 
-// ── ROA · ROE · CIR ──────────────────────────
+// ── ROA · ROE · 영업비용률 ──────────────────────────
 function renderRatios(D) {
   const rows = COS.map(co => {
     const f = D[co.key].fin;
@@ -505,7 +505,7 @@ function renderRatios(D) {
   return `<div class="three">
     ${card('roa', 'ROA', '총자산이익률 (Return on Assets)',    '당기순이익 ÷ 자산총계', '↑', false, '#4A9FE0')}
     ${card('roe', 'ROE', '자기자본이익률 (Return on Equity)',  '당기순이익 ÷ 자본총계', '↑', false, '#3DD68C')}
-    ${card('cir', 'CIR', '비용수익비율 (Cost-to-Income Ratio)','영업비용 ÷ 매출액', '↓', true,  '#F5C842')}
+    ${card('cir', '영업비용률', '매출원가 + 판매관리비 비중', '(매출액 − 영업이익) ÷ 매출액', '↓', true,  '#F5C842')}
   </div>`;
 }
 
@@ -527,20 +527,22 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
     ['인력','전체임직원',  co=>`${(D[co].emp.total||0).toLocaleString()}명`, a=>best(COS.map(co=>D[co.key].emp.total),false)],
     ['',    '정규직비율', co=>{const e=D[co].emp;return e.total?((e.reg/e.total)*100).toFixed(1)+'%':'N/A'}, a=>best(COS.map(co=>{const e=D[co.key].emp;return e.total?e.reg/e.total:0}),false)],
     ['',    '평균근속↑',  co=>{const e=D[co].emp;return e.total?((e.tenM*e.smM+e.tenF*e.smF)/e.total).toFixed(1)+'년':'N/A'}, a=>best(COS.map(co=>{const e=D[co.key].emp;return e.total?(e.tenM*e.smM+e.tenF*e.smF)/e.total:0}),false)],
-    ['인건비','인건비총액',co=>억(D[co].emp.salTot||0), a=>best(COS.map(co=>D[co.key].emp.salTot),false)],
-    ['',     '1인평균연봉↑',co=>`${만(D[co].emp.avgAll||0)}원`, a=>best(COS.map(co=>D[co.key].emp.avgAll),false)],
-    ['',     '매출대비인건비↓',co=>{const e=D[co].emp,f=D[co].fin;return f.rev.c&&e.salTot?(e.salTot/f.rev.c*100).toFixed(2)+'%':'N/A'}, a=>best(COS.map(co=>{const e=D[co.key].emp,f=D[co.key].fin;return f.rev.c&&e.salTot?e.salTot/f.rev.c:9999}),true)],
+    ['급여','직원급여총액',co=>억(D[co].emp.salTot||0), a=>best(COS.map(co=>D[co.key].emp.salTot),false)],
+    ['',     '1인평균급여↑',co=>`${만(D[co].emp.avgAll||0)}원`, a=>best(COS.map(co=>D[co.key].emp.avgAll),false)],
+    ['',     '매출대비급여↓',co=>{const e=D[co].emp,f=D[co].fin;return f.rev.c&&e.salTot?(e.salTot/f.rev.c*100).toFixed(2)+'%':'N/A'}, a=>best(COS.map(co=>{const e=D[co.key].emp,f=D[co.key].fin;return f.rev.c&&e.salTot?e.salTot/f.rev.c:9999}),true)],
     ['수익성','ROA ↑',  co=>{const f=D[co].fin;const v=f.ta.c?f.net.c/f.ta.c*100:0;return`<span style="${v<0?'color:var(--neg)':''}">${v.toFixed(2)}%</span>`}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.ta.c?f.net.c/f.ta.c:0}),false)],
     ['',     'ROE ↑',  co=>{const f=D[co].fin;const v=f.eq.c?f.net.c/f.eq.c*100:0;return`<span style="${v<0?'color:var(--neg)':''}">${v.toFixed(2)}%</span>`}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.eq.c?f.net.c/f.eq.c:0}),false)],
-    ['',     'CIR ↓',  co=>{const f=D[co].fin;const v=f.rev.c?(f.rev.c-f.op.c)/f.rev.c*100:0;return f.rev.c?v.toFixed(2)+'%':'N/A'}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.rev.c?(f.rev.c-f.op.c)/f.rev.c:9999}),true)],
+    ['',     '영업비용률 ↓',  co=>{const f=D[co].fin;const v=f.rev.c?(f.rev.c-f.op.c)/f.rev.c*100:0;return f.rev.c?v.toFixed(2)+'%':'N/A'}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.rev.c?(f.rev.c-f.op.c)/f.rev.c:9999}),true)],
   ];
   const cc = ['c1t','c2t','c3t'];
   const tbody = rows.map(([cat,item,vFn,bFn]) => {
+    if (_cumulative && cat === '급여') return `<tr><td>급여</td><td colspan="${COS.length+1}" style="text-align:left;color:var(--dim)">분기·반기보고서 기준이라 비교하지 않음 (회사별 급여 공시 기간이 달라 왜곡 가능) — 사업보고서 연도에서 확인</td></tr>`;
+    if (_cumulative && ['직원급여총액','1인평균급여↑','매출대비급여↓'].includes(item)) return '';
     const bestIdx = bFn(null);
-    return `<tr><td>${cat}</td><td>${item}</td>${COS.map((co,i)=>{const isEmp=['전체임직원','정규직비율','평균근속↑','인건비총액','1인평균연봉↑'].includes(item);const miss=isEmp?!D[co.key].emp.total:(_missing.has(co.key)||(item==='매출대비인건비↓'&&!D[co.key].emp.total));return miss?`<td style="color:var(--dim)">—</td>`:`<td class="${i===bestIdx?cc[i]+' best':''}">${vFn(co.key)}${i===bestIdx?' ★':''}</td>`}).join('')}</tr>`;
+    return `<tr><td>${cat}</td><td>${item}</td>${COS.map((co,i)=>{const isEmp=['전체임직원','정규직비율','평균근속↑','직원급여총액','1인평균급여↑'].includes(item);const miss=isEmp?!D[co.key].emp.total:(_missing.has(co.key)||(item==='매출대비급여↓'&&!D[co.key].emp.total));return miss?`<td style="color:var(--dim)">—</td>`:`<td class="${i===bestIdx?cc[i]+' best':''}">${vFn(co.key)}${i===bestIdx?' ★':''}</td>`}).join('')}</tr>`;
   }).join('');
   return `<div class="tbl-card">
-    <div class="tbl-hd">종합 재무 · 수익성 · 인력 · 인건비 비교 (${year}년${reprtLabel !== '사업보고서' ? ` · ${reprtLabel} 기준` : ''})</div>
+    <div class="tbl-hd">종합 재무 · 수익성 · 인력 · 직원급여 비교 (${year}년${reprtLabel !== '사업보고서' ? ` · ${reprtLabel} 기준` : ''})</div>
     <div style="overflow-x:auto"><table>
       <thead><tr><th>구분</th><th>항목</th>
         <th style="color:var(--c1)">풀무원식품</th>
@@ -629,8 +631,8 @@ function renderVerify(D, year, reprtLabel) {
         <td>${만(emp.avgF)}원/년</td></tr>
       <tr style="border-top:1px solid var(--border)">
         <td><strong>1인평균(전체)</strong></td>
-        <td>(남+여) ÷ 2</td>
-        <td>${Math.round((n2(mRow.jan_salary_am)+n2(fRow.jan_salary_am))*multApplied/2).toLocaleString()}</td>
+        <td>급여총액 ÷ 인원</td>
+        <td>${(n2(mRow.sm)+n2(fRow.sm)) ? Math.round(rawSalTot*multApplied/(n2(mRow.sm)+n2(fRow.sm))).toLocaleString() : '—'}</td>
         <td><strong>${만(emp.avgAll)}원/년</strong></td></tr>
     ` : `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:10px">임직원 데이터 없음</td></tr>`;
 
@@ -650,7 +652,7 @@ function renderVerify(D, year, reprtLabel) {
     <div style="background:rgba(74,159,224,.05);border:1px solid rgba(74,159,224,.12);border-radius:8px;padding:9px 14px;font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6">
       재무수치 <strong style="color:var(--text)">DART 원본값</strong>과 대시보드 계산값이 일치하면 <span style="color:#3DD68C">✓</span>,
       계정 미매핑 <span style="color:var(--neg)">✗</span>, 값 불일치 <span style="color:var(--warn)">!</span> 로 표시됩니다.
-      1인평균(전체) 원본값 = <code style="background:rgba(255,255,255,.06);padding:0 4px;border-radius:3px">(남 jan_salary_am + 여 jan_salary_am) ÷ 2</code>
+      1인평균(전체) 원본값 = <code style="background:rgba(255,255,255,.06);padding:0 4px;border-radius:3px">(남+여 fyer_salary_totamt) ÷ (남+여 sm)</code>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px;margin-top:10px">
       ${sections}
@@ -722,8 +724,13 @@ async function loadData() {
   }
 
   const note = _cumulative
-    ? `<div class="note-bar">${year}년은 아직 사업보고서가 공시되지 않아 <strong>${reprtLabel}</strong> 기준입니다. 손익·인건비는 해당 시점까지의 누적금액이며 연환산하지 않았으므로, 다른 연도(연간)와 직접 비교하지 마세요.</div>`
+    ? `<div class="note-bar">${year}년은 아직 사업보고서가 공시되지 않아 <strong>${reprtLabel}</strong> 기준입니다. 손익은 해당 시점까지의 누적금액이며 연환산하지 않았으므로, 다른 연도(연간)와 직접 비교하지 마세요. 직원 급여는 회사마다 공시 기간(연간/누적)이 달라 이 화면에서는 비교하지 않습니다.</div>`
     : '';
+  const salSection = _cumulative
+    ? `<div class="sec-label">직원 급여 현황</div>
+    <div class="note-bar" style="color:var(--muted);border-color:var(--border);background:rgba(255,255,255,.03)">분기·반기보고서는 회사별로 급여 공시 기준이 달라(연간 금액/기간 누적 금액) 비교하면 왜곡됩니다. 직원 급여 비교는 사업보고서 연도에서 확인하세요.</div>`
+    : `<div class="sec-label">직원 급여 현황</div>
+    <div class="three">${renderSal(D)}</div>`;
 
   document.getElementById('main').innerHTML = `
     ${note}
@@ -733,8 +740,7 @@ async function loadData() {
     ${renderRatios(D)}
     <div class="sec-label">인력 현황</div>
     <div class="three">${renderEmp(D)}</div>
-    <div class="sec-label">인건비 현황</div>
-    <div class="three">${renderSal(D)}</div>
+    ${salSection}
     ${renderTable(D, year, reprtLabel)}
     <div style="text-align:center;padding:4px 0 6px">
       <button id="vfy-btn" onclick="toggleVerify()" style="background:rgba(74,159,224,.12);border:1px solid rgba(74,159,224,.28);color:#7DB8F5;padding:5px 16px;border-radius:6px;cursor:pointer;font-size:11.5px;font-weight:600;transition:opacity .15s">
