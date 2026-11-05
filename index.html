@@ -454,6 +454,21 @@ function renderSal(D) {
           <span style="font-size:10px;color:var(--muted)">전체 1인평균</span>
           <span style="font-size:15px;font-weight:700;color:${co.color}">${만(e.avgAll)}<span style="font-size:10px;font-weight:400;color:var(--muted)">원/년</span></span>
         </div>
+        ${(() => { const x = D[co.key].ex;
+          return `<div class="sg">
+            <div class="sgb"><div class="sgl">임원 보수총액${x && x.found ? ` (${x.cnt}명)` : ''}</div><div class="sgv">${x && x.found ? 억(x.tot) : '<span style="font-size:11px;color:var(--dim)">미수집</span>'}</div></div>
+            <div class="sgb"><div class="sgl">임원 1인평균</div><div class="sgv">${x && x.found && x.avg ? payFmt(x.avg).replace(/원$/, '') + '<span class="sgu">원/년</span>' : '<span style="font-size:11px;color:var(--dim)">—</span>'}</div></div>
+          </div>`; })()}
+        ${(() => { const d = D[co.key], l = laborOf(d), r = sgaLaborOf(d);
+          return `<div class="avg-box" style="flex-direction:column;align-items:stretch;gap:4px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:10px;color:var(--muted)">판관비인건비비율</span>
+              <span style="font-size:15px;font-weight:700;color:${co.color}">${r === null ? '—' : (r*100).toFixed(1) + '%'}</span>
+            </div>
+            <div style="font-size:9.5px;color:var(--dim);text-align:right">${r === null ? '판관비 데이터 없음' :
+              `총인건비 ${억(l.tot)} ÷ 판관비 ${억(d.sg.sga.c)}`}</div>
+            <div style="font-size:9px;color:var(--dim);text-align:right">${l ? `직원 급여 ${억(l.emp)} + 임원 보수 ${l.exeFound ? 억(l.exe) : '미수집'}` : ''}</div>
+          </div>`; })()}
       </div>
     </div>`;
   }).join('');
@@ -470,16 +485,47 @@ function parseSGA(rows) {
   const amt = r => {
     if (!r) return { c: 0, p: 0, nm: '' };
     const useAdd = _cumulative && r.thstrm_add_amount;
-    return { c: n(useAdd ? r.thstrm_add_amount : r.thstrm_amount), p: n(useAdd ? r.frmtrm_add_amount : r.frmtrm_amount), nm: r.account_nm, row: r };
+    return { c: n(useAdd ? r.thstrm_add_amount : r.thstrm_amount), p: n(useAdd ? r.frmtrm_add_amount : r.frmtrm_amount), nm: r.account_nm };
   };
+  const nm = r => (r.account_nm || '').replace(/\s/g, '');
   const sgaRow = src.find(r => SGA_ID.test(r.account_id || '')) || src.find(r => SGA_NM.test(r.account_nm || ''));
   const badRow = src.find(r => BAD_NM.test(r.account_nm || ''));
-  return { ok: !!sgaRow, sga: amt(sgaRow), bad: amt(badRow), badFound: !!badRow };
+  const gpRow  = src.find(r => /^매출총이익/.test(nm(r)));
+  const opRow  = src.find(r => /^영업이익/.test(nm(r)));
+  const line = amt(sgaRow), bad = amt(badRow), gp = amt(gpRow), op = amt(opRow);
+  // 회사마다 물류비·연구개발비를 판관비와 따로 표시하기도 하므로,
+  // 판관비 = 매출총이익 − 영업이익 − 대손상각비 (매출총이익~영업이익 사이 영업비용 전체)로 통일
+  const extras = src.filter(r => /^(물류비|연구개발비|경상연구개발비)$/.test(nm(r))).map(r => r.account_nm);
+  if (gpRow && opRow) {
+    return { ok: true, method: 'gp', sga: { c: gp.c - op.c - bad.c }, line, bad, badFound: !!badRow, gp, op, opFound: true, extras };
+  }
+  return { ok: !!sgaRow, method: 'line', sga: line, line, bad, badFound: !!badRow, gp, op, opFound: !!opRow, extras };
 }
 const cirOf = d => {
   if (_missing.has(d.key) || !d.sg || !d.sg.ok) return null;
   const den = d.sg.sga.c + d.sg.bad.c + d.fin.op.c;
   return den > 0 ? d.sg.sga.c / den : null;
+};
+
+// ── 판관비인건비비율 = 총인건비 ÷ 판관비 ──
+// 총인건비 = 직원 급여총액(empSttus) + 임원 보수총액(hmvAuditAllSttus, 이사·감사 전체)
+const payFmt = v => Math.abs(v) >= 1e8 ? 억(v) + '원' : 만(v) + '원';
+function parseExec(rows) {
+  if (!rows.length) return { found: false, tot: 0, cnt: 0 };
+  const tot = rows.reduce((a, r) => a + n(r.mendng_totamt), 0), cnt = rows.reduce((a, r) => a + n(r.nmpr), 0);
+  // 1인평균: DART 공시값(jan_avrg_mendng_am)이 있으면 그대로, 없으면 총액 ÷ 인원
+  const avgDart = rows.length === 1 ? n(rows[0].jan_avrg_mendng_am) : 0;
+  return { found: true, tot, cnt, avg: avgDart || (cnt ? Math.round(tot / cnt) : 0), avgSrc: avgDart ? 'DART 공시' : '총액÷인원' };
+}
+const laborOf = d => {
+  if (!d.emp.total) return null;
+  return { emp: d.emp.salTot, exe: d.ex && d.ex.found ? d.ex.tot : 0, exeFound: !!(d.ex && d.ex.found),
+           tot: d.emp.salTot + (d.ex && d.ex.found ? d.ex.tot : 0) };
+};
+const sgaLaborOf = d => {
+  const l = laborOf(d);
+  if (!l || _missing.has(d.key) || !d.sg || !d.sg.ok || d.sg.sga.c <= 0) return null;
+  return l.tot / d.sg.sga.c;
 };
 
 // 1인당 영업이익 = 영업이익 ÷ 기말 임직원 수 (DART 직원현황 기준, 임원 제외)
@@ -561,6 +607,10 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
     ['',    '1인당영업이익↑', co=>{const v=opPerHead(D[co]);return v===null?'N/A':`<span style="${v<0?'color:var(--neg)':''}">${만(v)}원</span>`}, a=>best(COS.map(co=>opPerHead(D[co.key])??-Infinity),false)],
     ['',    '평균근속↑',  co=>{const e=D[co].emp;return e.total?((e.tenM*e.smM+e.tenF*e.smF)/e.total).toFixed(1)+'년':'N/A'}, a=>best(COS.map(co=>{const e=D[co.key].emp;return e.total?(e.tenM*e.smM+e.tenF*e.smF)/e.total:0}),false)],
     ['급여','직원급여총액',co=>억(D[co].emp.salTot||0), a=>best(COS.map(co=>D[co.key].emp.salTot),false)],
+    ['',     '총인건비',co=>{const l=laborOf(D[co]);return l?억(l.tot)+(l.exeFound?'':' <span style="color:var(--dim);font-size:9px">(임원 미포함)</span>'):'N/A'}, a=>-1],
+    ['',     '임원보수총액',co=>{const x=D[co].ex;return x&&x.found?`${억(x.tot)} <span style="color:var(--dim);font-size:9px">(${x.cnt}명)</span>`:'N/A'}, a=>-1],
+    ['',     '임원1인평균보수',co=>{const x=D[co].ex;return x&&x.found&&x.avg?payFmt(x.avg):'N/A'}, a=>-1],
+    ['',     '판관비인건비비율',co=>{const r=sgaLaborOf(D[co]);return r===null?'N/A':(r*100).toFixed(1)+'%'}, a=>-1],
     ['',     '1인평균급여↑',co=>`${만(D[co].emp.avgAll||0)}원`, a=>best(COS.map(co=>D[co.key].emp.avgAll),false)],
     ['',     '매출대비급여↓',co=>{const e=D[co].emp,f=D[co].fin;return f.rev.c&&e.salTot?(e.salTot/f.rev.c*100).toFixed(2)+'%':'N/A'}, a=>best(COS.map(co=>{const e=D[co.key].emp,f=D[co.key].fin;return f.rev.c&&e.salTot?e.salTot/f.rev.c:9999}),true)],
     ['수익성','ROA(평잔) ↑',  co=>{const v=roaOf(D[co].fin)*100;return`<span style="${v<0?'color:var(--neg)':''}">${v.toFixed(2)}%</span>`}, a=>best(COS.map(co=>roaOf(D[co.key].fin)),false)],
@@ -570,9 +620,9 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
   const cc = ['c1t','c2t','c3t'];
   const tbody = rows.map(([cat,item,vFn,bFn]) => {
     if (_cumulative && cat === '급여') return `<tr><td>급여</td><td colspan="${COS.length+1}" style="text-align:left;color:var(--dim)">분기·반기보고서 기준이라 비교하지 않음 (회사별 급여 공시 기간이 달라 왜곡 가능) — 사업보고서 연도에서 확인</td></tr>`;
-    if (_cumulative && ['직원급여총액','1인평균급여↑','매출대비급여↓'].includes(item)) return '';
+    if (_cumulative && ['직원급여총액','임원보수총액','임원1인평균보수','총인건비','판관비인건비비율','1인평균급여↑','매출대비급여↓'].includes(item)) return '';
     const bestIdx = bFn(null);
-    return `<tr><td>${cat}</td><td>${item}</td>${COS.map((co,i)=>{const isEmp=['전체임직원','정규직비율','평균근속↑','직원급여총액','1인평균급여↑'].includes(item);const miss=item==='CIR ↓'?cirOf(D[co.key])===null:item==='1인당영업이익↑'?opPerHead(D[co.key])===null:isEmp?!D[co.key].emp.total:(_missing.has(co.key)||(item==='매출대비급여↓'&&!D[co.key].emp.total));return miss?`<td style="color:var(--dim)">—</td>`:`<td class="${i===bestIdx?cc[i]+' best':''}">${vFn(co.key)}${i===bestIdx?' ★':''}</td>`}).join('')}</tr>`;
+    return `<tr><td>${cat}</td><td>${item}</td>${COS.map((co,i)=>{const isEmp=['전체임직원','정규직비율','평균근속↑','직원급여총액','1인평균급여↑','총인건비'].includes(item);const miss=(item==='임원보수총액'||item==='임원1인평균보수')?!(D[co.key].ex&&D[co.key].ex.found):item==='판관비인건비비율'?sgaLaborOf(D[co.key])===null:item==='CIR ↓'?cirOf(D[co.key])===null:item==='1인당영업이익↑'?opPerHead(D[co.key])===null:isEmp?!D[co.key].emp.total:(_missing.has(co.key)||(item==='매출대비급여↓'&&!D[co.key].emp.total));return miss?`<td style="color:var(--dim)">—</td>`:`<td class="${i===bestIdx?cc[i]+' best':''}">${vFn(co.key)}${i===bestIdx?' ★':''}</td>`}).join('')}</tr>`;
   }).join('');
   return `<div class="tbl-card">
     <div class="tbl-hd">종합 재무 · 수익성 · 인력 · 직원급여 비교 (${year}년${reprtLabel !== '사업보고서' ? ` · ${reprtLabel} 기준` : ''})</div>
@@ -584,7 +634,7 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
       </tr></thead>
       <tbody>${tbody}</tbody>
     </table></div>
-    <div class="tbl-ft">★ 해당 항목 최고값(유리한 방향 기준) · 별도(OFS) 재무제표 기준 · ROA·ROE 평잔 = (전기말 + 당기말) ÷ 2 · CIR = 판관비 ÷ (판관비 + 대손상각비 + 영업이익), 대손상각비는 손익계산서 본문에 별도 표시된 경우만 반영(없으면 판관비에 포함된 것으로 봄) · 1인당 영업이익 = 영업이익 ÷ 기말 직원 수 · 출처: DART Open API</div>
+    <div class="tbl-ft">★ 해당 항목 최고값(유리한 방향 기준) · 별도(OFS) 재무제표 기준 · ROA·ROE 평잔 = (전기말 + 당기말) ÷ 2 · CIR = 판관비 ÷ (판관비 + 대손상각비 + 영업이익), 판관비는 매출총이익 − 영업이익 − 대손상각비(물류비·연구개발비 별도 표시 회사도 포함되도록 통일), 대손상각비는 손익계산서 본문에 별도 표시된 경우만 반영(없으면 판관비에 포함된 것으로 봄) · 1인당 영업이익 = 영업이익 ÷ 기말 직원 수 · 임원 보수 = 이사·감사 전체 보수총액(사외이사·감사 포함) · 판관비인건비비율 = 총인건비(직원 급여총액 + 임원 보수총액) ÷ 판관비. 직원 급여에는 생산직 등 매출원가 인건비도 포함됨 · 출처: DART Open API</div>
   </div>`;
 }
 
@@ -635,11 +685,25 @@ function renderVerify(D, year, reprtLabel) {
     const cirV = cirOf(D[co.key]);
     const sgaRows = `
       <tr style="background:rgba(255,255,255,.015)"><td colspan="4" style="font-size:10px;padding-top:9px;color:var(--muted)">CIR 산출 (전체 재무제표 손익계산서)</td></tr>
-      <tr><td>판관비</td><td>${sg.ok ? sg.sga.nm : '—'}</td><td>${sg.ok ? 억(sg.sga.c) : '—'}</td>
-        <td>${sg.ok ? '<span style="color:#3DD68C">✓</span>' : '<span style="color:var(--neg)">✗ 미수집·미매핑</span>'}</td></tr>
+      <tr><td>판관비 계정(표시)</td><td>${sg.line && sg.line.nm ? sg.line.nm : '—'}</td><td>${sg.line && sg.line.nm ? 억(sg.line.c) : '—'}</td>
+        <td>${sg.extras && sg.extras.length ? '<span style="color:var(--warn)">별도 표시: ' + sg.extras.join('·') + '</span>' : ''}</td></tr>
+      <tr><td><strong>판관비(산출)</strong></td><td>${sg.method === 'gp' ? '매출총이익 − 영업이익 − 대손' : '판관비 계정값'}</td>
+        <td>${sg.method === 'gp' ? 억(sg.gp.c) + ' − ' + 억(sg.op.c) + (sg.badFound ? ' − ' + 억(sg.bad.c) : '') : ''}</td>
+        <td>${sg.ok ? '<span style="color:#3DD68C">✓</span> <strong>' + 억(sg.sga.c) + '</strong>' : '<span style="color:var(--neg)">✗ 미수집·미매핑</span>'}</td></tr>
       <tr><td>대손상각비</td><td>${sg.badFound ? sg.bad.nm : '본문 별도계정 없음'}</td><td>${sg.badFound ? 억(sg.bad.c) : '0 (판관비 포함)'}</td><td></td></tr>
       <tr><td><strong>CIR</strong></td><td>판관비÷(판관비+대손+영업이익)</td><td></td>
         <td><strong>${cirV === null ? '—' : (cirV*100).toFixed(2) + '%'}</strong></td></tr>`;
+    const lab = laborOf(D[co.key]), slr = sgaLaborOf(D[co.key]);
+    const laborRows = `
+      <tr style="background:rgba(255,255,255,.015)"><td colspan="4" style="font-size:10px;padding-top:9px;color:var(--muted)">판관비인건비비율 산출</td></tr>
+      <tr><td>직원 급여총액</td><td>empSttus fyer_salary_totamt</td><td></td><td>${lab ? 억(lab.emp) : '—'}</td></tr>
+      <tr><td>임원 보수총액</td><td>hmvAuditAllSttus mendng_totamt</td><td>${D[co.key].ex && D[co.key].ex.found ? D[co.key].ex.cnt + '명' : ''}</td>
+        <td>${lab && lab.exeFound ? 억(lab.exe) : '<span style="color:var(--warn)">미수집</span>'}</td></tr>
+      <tr><td>임원 1인평균</td><td>${D[co.key].ex && D[co.key].ex.found ? D[co.key].ex.avgSrc : 'jan_avrg_mendng_am'}</td><td></td>
+        <td>${D[co.key].ex && D[co.key].ex.found && D[co.key].ex.avg ? payFmt(D[co.key].ex.avg) + '/년' : '—'}</td></tr>
+      <tr><td><strong>판관비인건비비율</strong></td><td>총인건비 ÷ 판관비(산출)</td>
+        <td>${slr === null ? '' : 억(lab.tot) + ' ÷ ' + 억(D[co.key].sg.sga.c)}</td>
+        <td><strong>${slr === null ? '—' : (slr*100).toFixed(1) + '%'}</strong></td></tr>`;
     const mRow = empRaw.find(r => r.sexdstn === '남') || {};
     const fRow = empRaw.find(r => r.sexdstn === '여') || {};
     const n2 = s => parseInt(String(s||'').replace(/,/g,'')) || 0;
@@ -682,7 +746,7 @@ function renderVerify(D, year, reprtLabel) {
       <div style="font-size:12px;font-weight:700;color:${co.color};margin-bottom:10px">${co.name.replace('&amp;','&')}</div>
       <table class="vfy-tbl">
         <thead><tr><th>항목</th><th>DART 계정과목/필드</th><th>DART 원본값</th><th>대시보드 계산값</th></tr></thead>
-        <tbody>${finRows}${sgaRows}${empRows}</tbody>
+        <tbody>${finRows}${sgaRows}${laborRows}${empRows}</tbody>
       </table>
     </div>`;
   }).join('');
@@ -754,10 +818,14 @@ async function loadData() {
     const fList = fin.status === '000' ? (fin.list || []) : [];
     const full = c.full || { status:'', list:[] };
     const aList = full.status === '000' ? (full.list || []) : [];
+    const exR = c.exec || { status:'', list:[] };
+    const xList = exR.status === '000' ? (exR.list || []) : [];
     const eList = emp.status === '000' ? (emp.list || []) : [];
     if (!fList.length) _missing.add(co.key);
     if (!fList.length) errs.push(`${nm}: ${fin.message || '재무데이터 없음'}${fin.status ? ' (' + fin.status + ')' : ''}`);
-    D[co.key] = { key: co.key, fin: parseFS(fList), emp: parseEmp(eList), sg: parseSGA(aList), finRaw: fList, empRaw: eList };
+    const finP = parseFS(fList), sgP = parseSGA(aList);
+    if (!finP.op.nm && sgP.opFound) { finP.op = { c: sgP.op.c, p: sgP.op.p, nm: '전체재무제표', filled: true }; }
+    D[co.key] = { key: co.key, fin: finP, emp: parseEmp(eList), sg: sgP, ex: parseExec(xList), finRaw: fList, empRaw: eList };
   }
   done();
 
