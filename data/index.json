@@ -1,5 +1,5 @@
 {
- "updated_at": "2026-11-05 13:21",
+ "updated_at": "2026-11-05 13:27",
  "companies": [
   {
    "key": "p",
@@ -22,73 +22,73 @@
    "year": 2015,
    "reprt_code": "11011",
    "reprt_label": "사업보고서",
-   "fetched_at": "2026-11-05 10:30"
+   "fetched_at": "2026-11-05 13:22"
   },
   {
    "year": 2016,
    "reprt_code": "11011",
    "reprt_label": "사업보고서",
-   "fetched_at": "2026-11-05 10:30"
+   "fetched_at": "2026-11-05 13:23"
   },
   {
    "year": 2017,
    "reprt_code": "11011",
    "reprt_label": "사업보고서",
-   "fetched_at": "2026-11-05 10:30"
+   "fetched_at": "2026-11-05 13:23"
   },
   {
    "year": 2018,
    "reprt_code": "11011",
    "reprt_label": "사업보고서",
-   "fetched_at": "2026-11-05 10:30"
+   "fetched_at": "2026-11-05 13:23"
   },
   {
    "year": 2019,
    "reprt_code": "11011",
    "reprt_label": "사업보고서",
-   "fetched_at": "2026-11-05 10:30"
+   "fetched_at": "2026-11-05 13:23"
   },
   {
    "year": 2020,
    "reprt_code": "11011",
    "reprt_label": "사업보고서",
-   "fetched_at": "2026-11-05 10:30"
+   "fetched_at": "2026-11-05 13:24"
   },
   {
    "year": 2021,
    "reprt_code": "11011",
    "reprt_label": "사업보고서",
-   "fetched_at": "2026-11-05 10:30"
+   "fetched_at": "2026-11-05 13:24"
   },
   {
    "year": 2022,
    "reprt_code": "11011",
    "reprt_label": "사업보고서",
-   "fetched_at": "2026-11-05 10:31"
+   "fetched_at": "2026-11-05 13:25"
   },
   {
    "year": 2023,
    "reprt_code": "11011",
    "reprt_label": "사업보고서",
-   "fetched_at": "2026-11-05 10:31"
+   "fetched_at": "2026-11-05 13:25"
   },
   {
    "year": 2024,
    "reprt_code": "11011",
    "reprt_label": "사업보고서",
-   "fetched_at": "2026-11-05 10:31"
+   "fetched_at": "2026-11-05 13:25"
   },
   {
    "year": 2025,
    "reprt_code": "11011",
    "reprt_label": "사업보고서",
-   "fetched_at": "2026-11-05 13:21"
+   "fetched_at": "2026-11-05 13:26"
   },
   {
    "year": 2026,
    "reprt_code": "11012",
    "reprt_label": "반기보고서",
-   "fetched_at": "2026-11-05 13:21"
+   "fetched_at": "2026-11-05 13:26"
   }
  ]
 }
