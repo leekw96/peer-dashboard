@@ -86,9 +86,13 @@ def fetch_year(year, key, reprt_code, reprt_label):
         full = call("fnlttSinglAcntAll.json", key, corp_code=co["code"], bsns_year=year,
                     reprt_code=reprt_code, fs_div="OFS")
         full["list"] = [r for r in full["list"] if r.get("sj_div") in ("IS", "CIS")]
-        out["companies"][co["key"]] = {"name": co["name"], "fin": fin, "emp": emp, "full": full}
+        # 이사·감사 전체 보수현황 (총인건비 = 직원 급여총액 + 임원 보수총액)
+        exe = call("hmvAuditAllSttus.json", key, corp_code=co["code"], bsns_year=year,
+                   reprt_code=reprt_code)
+        out["companies"][co["key"]] = {"name": co["name"], "fin": fin, "emp": emp, "full": full, "exec": exe}
         print(f"  {year} {reprt_label} {co['name']:<8} 재무 {fin['status']}({len(fin['list'])}) "
-              f"임직원 {emp['status']}({len(emp['list'])}) 전체손익 {full['status']}({len(full['list'])})")
+              f"임직원 {emp['status']}({len(emp['list'])}) 전체손익 {full['status']}({len(full['list'])}) "
+              f"임원보수 {exe['status']}({len(exe['list'])})")
     return out
 
 
@@ -109,7 +113,7 @@ def main():
             try:
                 old = json.loads(path.read_text(encoding="utf-8"))
                 # 전체 재무제표(full)까지 받아 둔 사업보고서 파일이면 건너뜀
-                if old.get("reprt_code") == "11011" and all("full" in c for c in old["companies"].values()):
+                if old.get("reprt_code") == "11011" and all("full" in c and "exec" in c for c in old["companies"].values()):
                     continue
             except Exception:
                 pass
