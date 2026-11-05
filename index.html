@@ -162,7 +162,7 @@ tr:hover td{background:rgba(255,255,255,.018)}
 <div class="hdr">
   <div>
     <div class="hdr-t">동종업계 경영지표 대시보드</div>
-    <div class="hdr-s">풀무원식품 · 동원F&amp;B · 샘표식품 &nbsp;|&nbsp; 별도 재무제표 · 임직원 현황</div>
+    <div class="hdr-s">풀무원식품 · 동원F&amp;B · 샘표식품 &nbsp;|&nbsp; 별도 재무제표 · 임직원 현황 · 금액 단위: 백만원</div>
   </div>
   <div class="yr-wrap">
     <span class="badge">DART Open API</span>
@@ -262,12 +262,11 @@ function parseEmp(rows) {
 }
 
 // ── FORMAT ───────────────────────────────────
-const 억 = v => {
-  const a = Math.abs(v), s = v < 0 ? '-' : '';
-  return a >= 1e11 ? s + Math.round(a/1e8).toLocaleString() + '억'
-       : s + (a/1e8).toFixed(1) + '억';
-};
-const 만 = v => Math.round(v/10000).toLocaleString() + '만';
+// 금액 표시 단위: 백만원
+// 억(v): 합계 금액 → 정수 백만원 (예: 479,906백만원)
+// 만(v): 1인당 금액 → 소수 1자리 백만 (뒤에 '원'을 붙여 사용, 예: 59.9백만원)
+const 억 = v => Math.round(v / 1e6).toLocaleString() + '백만원';
+const 만 = v => (v / 1e6).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '백만';
 
 function yoyHtml(c, p) {
   if (!p) return '';
@@ -509,13 +508,18 @@ const cirOf = d => {
 
 // ── 판관비인건비비율 = 총인건비 ÷ 판관비 ──
 // 총인건비 = 직원 급여총액(empSttus) + 임원 보수총액(hmvAuditAllSttus, 이사·감사 전체)
-const payFmt = v => Math.abs(v) >= 1e8 ? 억(v) + '원' : 만(v) + '원';
+const payFmt = v => 만(v) + '원';
 function parseExec(rows) {
   if (!rows.length) return { found: false, tot: 0, cnt: 0 };
-  const tot = rows.reduce((a, r) => a + n(r.mendng_totamt), 0), cnt = rows.reduce((a, r) => a + n(r.nmpr), 0);
-  // 1인평균: DART 공시값(jan_avrg_mendng_am)이 있으면 그대로, 없으면 총액 ÷ 인원
-  const avgDart = rows.length === 1 ? n(rows[0].jan_avrg_mendng_am) : 0;
-  return { found: true, tot, cnt, avg: avgDart || (cnt ? Math.round(tot / cnt) : 0), avgSrc: avgDart ? 'DART 공시' : '총액÷인원' };
+  // 분기·반기보고서는 당기·전기·전전기 3개 행이 순서대로 옴 → 첫 행(당기)만 사용
+  const r = rows[0];
+  let tot = n(r.mendng_totamt), cnt = n(r.nmpr), avg = n(r.jan_avrg_mendng_am);
+  // 단위 보정: 1인평균이 1만 미만이면 백만원, 100만 미만이면 천원 단위로 공시된 것으로 판단
+  const per = cnt ? tot / cnt : 0;
+  const mult = (per > 0 && per < 1e4) ? 1e6 : (per > 0 && per < 1e6) ? 1e3 : 1;
+  tot *= mult; avg *= mult;
+  return { found: true, tot, cnt, avg: avg || (cnt ? Math.round(tot / cnt) : 0), avgSrc: avg ? 'DART 공시' : '총액÷인원',
+           mult, rowsUsed: rows.length > 1 ? `${rows.length}행 중 당기 1행` : '' };
 }
 const laborOf = d => {
   if (!d.emp.total) return null;
@@ -625,7 +629,7 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
     return `<tr><td>${cat}</td><td>${item}</td>${COS.map((co,i)=>{const isEmp=['전체임직원','정규직비율','평균근속↑','직원급여총액','1인평균급여↑','총인건비'].includes(item);const miss=(item==='임원보수총액'||item==='임원1인평균보수')?!(D[co.key].ex&&D[co.key].ex.found):item==='판관비인건비비율'?sgaLaborOf(D[co.key])===null:item==='CIR ↓'?cirOf(D[co.key])===null:item==='1인당영업이익↑'?opPerHead(D[co.key])===null:isEmp?!D[co.key].emp.total:(_missing.has(co.key)||(item==='매출대비급여↓'&&!D[co.key].emp.total));return miss?`<td style="color:var(--dim)">—</td>`:`<td class="${i===bestIdx?cc[i]+' best':''}">${vFn(co.key)}${i===bestIdx?' ★':''}</td>`}).join('')}</tr>`;
   }).join('');
   return `<div class="tbl-card">
-    <div class="tbl-hd">종합 재무 · 수익성 · 인력 · 직원급여 비교 (${year}년${reprtLabel !== '사업보고서' ? ` · ${reprtLabel} 기준` : ''})</div>
+    <div class="tbl-hd">종합 재무 · 수익성 · 인력 · 직원급여 비교 · 단위: 백만원 (${year}년${reprtLabel !== '사업보고서' ? ` · ${reprtLabel} 기준` : ''})</div>
     <div style="overflow-x:auto"><table>
       <thead><tr><th>구분</th><th>항목</th>
         <th style="color:var(--c1)">풀무원식품</th>
@@ -699,7 +703,8 @@ function renderVerify(D, year, reprtLabel) {
       <tr><td>직원 급여총액</td><td>empSttus fyer_salary_totamt</td><td></td><td>${lab ? 억(lab.emp) : '—'}</td></tr>
       <tr><td>임원 보수총액</td><td>hmvAuditAllSttus mendng_totamt</td><td>${D[co.key].ex && D[co.key].ex.found ? D[co.key].ex.cnt + '명' : ''}</td>
         <td>${lab && lab.exeFound ? 억(lab.exe) : '<span style="color:var(--warn)">미수집</span>'}</td></tr>
-      <tr><td>임원 1인평균</td><td>${D[co.key].ex && D[co.key].ex.found ? D[co.key].ex.avgSrc : 'jan_avrg_mendng_am'}</td><td></td>
+      <tr><td>임원 1인평균</td><td>${D[co.key].ex && D[co.key].ex.found ? D[co.key].ex.avgSrc : 'jan_avrg_mendng_am'}</td>
+        <td>${D[co.key].ex && D[co.key].ex.found ? [D[co.key].ex.mult === 1e6 ? '<span style="color:var(--warn)">⚠ 백만원→원 보정</span>' : D[co.key].ex.mult === 1e3 ? '<span style="color:var(--warn)">⚠ 천원→원 보정</span>' : '', D[co.key].ex.rowsUsed].filter(Boolean).join(' · ') : ''}</td>
         <td>${D[co.key].ex && D[co.key].ex.found && D[co.key].ex.avg ? payFmt(D[co.key].ex.avg) + '/년' : '—'}</td></tr>
       <tr><td><strong>판관비인건비비율</strong></td><td>총인건비 ÷ 판관비(산출)</td>
         <td>${slr === null ? '' : 억(lab.tot) + ' ÷ ' + 억(D[co.key].sg.sga.c)}</td>
