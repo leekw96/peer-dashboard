@@ -458,14 +458,19 @@ function renderSal(D) {
   }).join('');
 }
 
+// 평잔 = (기초 + 기말) ÷ 2 · 기초 = DART 전기말 잔액(frmtrm_amount). 기초가 없으면 기말 사용
+function avgBal(x) { return x.p ? (x.c + x.p) / 2 : x.c; }
+const roaOf = f => { const a = avgBal(f.ta); return a ? f.net.c / a : 0; };
+const roeOf = f => { const a = avgBal(f.eq); return a ? f.net.c / a : 0; };
+
 // ── ROA · ROE · 영업비용률 ──────────────────────────
 function renderRatios(D) {
   const rows = COS.map(co => {
     const f = D[co.key].fin;
     return {
       co,
-      roa: f.ta.c ? f.net.c / f.ta.c * 100 : 0,
-      roe: f.eq.c ? f.net.c / f.eq.c * 100 : 0,
+      roa: roaOf(f) * 100,
+      roe: roeOf(f) * 100,
       cir: f.rev.c ? (f.rev.c - f.op.c) / f.rev.c * 100 : 0,
     };
   });
@@ -503,8 +508,8 @@ function renderRatios(D) {
   }
 
   return `<div class="three">
-    ${card('roa', 'ROA', '총자산이익률 (Return on Assets)',    '당기순이익 ÷ 자산총계', '↑', false, '#4A9FE0')}
-    ${card('roe', 'ROE', '자기자본이익률 (Return on Equity)',  '당기순이익 ÷ 자본총계', '↑', false, '#3DD68C')}
+    ${card('roa', 'ROA', '총자산이익률 (Return on Assets)',    '당기순이익 ÷ 자산총계 평잔', '↑', false, '#4A9FE0')}
+    ${card('roe', 'ROE', '자기자본이익률 (Return on Equity)',  '당기순이익 ÷ 자본총계 평잔', '↑', false, '#3DD68C')}
     ${card('cir', '영업비용률', '매출원가 + 판매관리비 비중', '(매출액 − 영업이익) ÷ 매출액', '↓', true,  '#F5C842')}
   </div>`;
 }
@@ -530,8 +535,8 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
     ['급여','직원급여총액',co=>억(D[co].emp.salTot||0), a=>best(COS.map(co=>D[co.key].emp.salTot),false)],
     ['',     '1인평균급여↑',co=>`${만(D[co].emp.avgAll||0)}원`, a=>best(COS.map(co=>D[co.key].emp.avgAll),false)],
     ['',     '매출대비급여↓',co=>{const e=D[co].emp,f=D[co].fin;return f.rev.c&&e.salTot?(e.salTot/f.rev.c*100).toFixed(2)+'%':'N/A'}, a=>best(COS.map(co=>{const e=D[co.key].emp,f=D[co.key].fin;return f.rev.c&&e.salTot?e.salTot/f.rev.c:9999}),true)],
-    ['수익성','ROA ↑',  co=>{const f=D[co].fin;const v=f.ta.c?f.net.c/f.ta.c*100:0;return`<span style="${v<0?'color:var(--neg)':''}">${v.toFixed(2)}%</span>`}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.ta.c?f.net.c/f.ta.c:0}),false)],
-    ['',     'ROE ↑',  co=>{const f=D[co].fin;const v=f.eq.c?f.net.c/f.eq.c*100:0;return`<span style="${v<0?'color:var(--neg)':''}">${v.toFixed(2)}%</span>`}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.eq.c?f.net.c/f.eq.c:0}),false)],
+    ['수익성','ROA(평잔) ↑',  co=>{const v=roaOf(D[co].fin)*100;return`<span style="${v<0?'color:var(--neg)':''}">${v.toFixed(2)}%</span>`}, a=>best(COS.map(co=>roaOf(D[co.key].fin)),false)],
+    ['',     'ROE(평잔) ↑',  co=>{const v=roeOf(D[co].fin)*100;return`<span style="${v<0?'color:var(--neg)':''}">${v.toFixed(2)}%</span>`}, a=>best(COS.map(co=>roeOf(D[co.key].fin)),false)],
     ['',     '영업비용률 ↓',  co=>{const f=D[co].fin;const v=f.rev.c?(f.rev.c-f.op.c)/f.rev.c*100:0;return f.rev.c?v.toFixed(2)+'%':'N/A'}, a=>best(COS.map(co=>{const f=D[co.key].fin;return f.rev.c?(f.rev.c-f.op.c)/f.rev.c:9999}),true)],
   ];
   const cc = ['c1t','c2t','c3t'];
@@ -551,7 +556,7 @@ function renderTable(D, year, reprtLabel = '사업보고서') {
       </tr></thead>
       <tbody>${tbody}</tbody>
     </table></div>
-    <div class="tbl-ft">★ 해당 항목 최고값(유리한 방향 기준) · 별도(OFS) 재무제표 기준 · 출처: DART Open API</div>
+    <div class="tbl-ft">★ 해당 항목 최고값(유리한 방향 기준) · 별도(OFS) 재무제표 기준 · ROA·ROE 평잔 = (전기말 + 당기말) ÷ 2 · 출처: DART Open API</div>
   </div>`;
 }
 
