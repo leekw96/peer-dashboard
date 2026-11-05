@@ -82,10 +82,10 @@ def fetch_year(year, key, reprt_code, reprt_label):
                    reprt_code=reprt_code, fs_div="OFS")
         emp = call("empSttus.json", key, corp_code=co["code"], bsns_year=year,
                    reprt_code=reprt_code)
-        # 전체 재무제표(판관비·대손상각비 등). 용량을 줄이려 손익계산서(IS/CIS)만 보관
+        # 전체 재무제표(판관비·대손상각비·차입금 등). 용량을 줄이려 재무상태표·손익계산서만 보관
         full = call("fnlttSinglAcntAll.json", key, corp_code=co["code"], bsns_year=year,
                     reprt_code=reprt_code, fs_div="OFS")
-        full["list"] = [r for r in full["list"] if r.get("sj_div") in ("IS", "CIS")]
+        full["list"] = [r for r in full["list"] if r.get("sj_div") in ("BS", "IS", "CIS")]
         # 이사·감사 전체 보수현황 (총인건비 = 직원 급여총액 + 임원 보수총액)
         exe = call("hmvAuditAllSttus.json", key, corp_code=co["code"], bsns_year=year,
                    reprt_code=reprt_code)
@@ -113,7 +113,13 @@ def main():
             try:
                 old = json.loads(path.read_text(encoding="utf-8"))
                 # 전체 재무제표(full)까지 받아 둔 사업보고서 파일이면 건너뜀
-                if old.get("reprt_code") == "11011" and all("full" in c and "exec" in c for c in old["companies"].values()):
+                def complete(c):
+                    f = c.get("full")
+                    if f is None or "exec" not in c:
+                        return False
+                    # 조회 결과가 없는 회사(013 등)는 다시 받아도 같으므로 완료로 봄
+                    return f.get("status") != "000" or any(r.get("sj_div") == "BS" for r in f.get("list", []))
+                if old.get("reprt_code") == "11011" and all(complete(c) for c in old["companies"].values()):
                     continue
             except Exception:
                 pass
